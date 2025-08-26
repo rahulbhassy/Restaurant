@@ -15,7 +15,7 @@ schema = {
     "fares" : "fares",
     "weatherimpact" : "fares",
     "timeseries" : "fares",
-    "custmerdetails" : "raw",
+    "customerdetails" : "raw",
     "driverdetails" : "raw",
     "vehicledetails" : "raw",
     "customerpreference" : "people",
