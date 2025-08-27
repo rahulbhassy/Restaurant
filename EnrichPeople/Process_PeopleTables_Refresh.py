@@ -4,11 +4,11 @@ from Shared.FileIO import SourceObjectAssignment , DataLakeIO , MergeIO
 from Shared.DataWriter import DataWriter
 from EnrichPeople.Harmonization import Harmonizer
 from Shared.pyspark_env import setVEnv , stop_spark
-
+from Shared.FileIO import SparkTableViewer
 
 
 setVEnv()
-table = "customerpreference"
+table = "driverprofile"
 loadtype = 'full'
 runtype = 'prod'
 initial_load = 'yes'
@@ -46,14 +46,15 @@ destination_data = harmonizer.harmonize(
     dataframes=dataframes,
     currentio=currentio
 )
-
+viewer = SparkTableViewer(df=destination_data)
+viewer.display()
 datawriter = DataWriter(
     loadtype=loadtype,
     path=currentio.filepath(),
     spark=spark,
     format='delta'
 )
-
+'''
 if initial_load == 'yes':
     datawriter.WriteData(df=destination_data)
 else:
@@ -64,5 +65,5 @@ else:
         key_columns= keys.get(table)
     )
     mergeconfig.merge(spark=spark,updated_df=destination_data)
-
+'''
 stop_spark(spark=spark)

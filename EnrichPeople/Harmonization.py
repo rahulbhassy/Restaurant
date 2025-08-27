@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, round, regexp_replace
 from pyspark.sql.window import Window
-from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit
+from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when
 
 class CustomerProfileHarmonizer:
     def __init__(self, loadtype: str, runtype: str = 'dev'):
@@ -318,11 +318,235 @@ class CustomerPreferenceHarmonizer:
             avg_driver_rating, 'customer_id', 'left'
         )
 
+class DriverProfileHarmonizer:
+    def __init__(self, loadtype: str, runtype: str = 'dev'):
+        self.loadtype = 'full'
+        self.runtype = runtype
+        self.default_weights = {
+            'trips': 0.35,
+            'distance': 0.25,
+            'tenure': 0.20,
+            'duration': 0.10,
+            'age': 0.10
+        }
+
+        self.weights = self.default_weights
+
+    @staticmethod
+    def clean_column_name(name):
+        return regexp_replace(name, r'[ ,;{}()\n\t=]', '_')
+
+    def harmonize(self, spark: SparkSession, dataframes: dict, currentio: Optional[DataLakeIO]):
+        # Clean column names once
+        clean_col = self.clean_column_name
+        # Calculate age and tenure
+        driverdetails = (
+            dataframes['driverdetails']
+            .withColumn('age', round(datediff(to_date(lit("2016-01-01"), "yyyy-MM-dd"),
+                                              to_date(col("date_of_birth"), "yyyy-MM-dd")) / 365.25, 2))
+            .withColumn('tenure', round(datediff(to_date(lit("2016-01-01"), "yyyy-MM-dd"),
+                                                 to_date(col("hire_date"), "yyyy-MM-dd")) / 365.25, 2))
+            .select('driver_id', 'driver_name','license_no','phone_no','emergency_contact', 'email','address',
+                    'date_of_birth', 'hire_date',
+                    'status', 'age', 'tenure')
+        )
+
+        # Clean relevant columns
+        tripdetails = (
+            dataframes['tripdetails']
+            .select('trip_id', 'driver_id',
+                    clean_col('payment_method').alias('payment_method'),
+                    clean_col('trip_status').alias('trip_status'),
+                    clean_col('trip_intention').alias('trip_intention'),
+                    'driver_rating')
+        )
+
+        fares = (
+            dataframes['fares']
+            .select('trip_id', 'distance_km', 'trip_duration_min', 'tip_amount',
+                    'total_fareamount', 'tip_pct', 'pickup_month', 'pickup_day',
+                    clean_col('pickup_period').alias('pickup_period'),
+                    'is_weather_extreme')
+        )
+        fares_trip_combined = fares.join(tripdetails, on='trip_id', how='inner')
+        pm_stats = (
+            fares_trip_combined
+            .groupby('driver_id','payment_method')
+            .agg(
+                F.count('*').alias('payment_count'),
+                round(F.sum('total_fareamount'),2).alias('total_payment_amount')
+                 )
+        )
+        # Single pivot for payment counts and amounts
+        payment_methods_df = pm_stats.select('payment_method').distinct()
+        payment_methods = [row.payment_method for row in payment_methods_df.collect()]
+
+        pivot_count_exprs = [
+            F.first(F.when(col('payment_method') == method, col('payment_count')), True).alias(f'cnt_{method}_payment')
+            for method in payment_methods]
+        pivot_amount_exprs = [F.first(F.when(col('payment_method') == method, col('total_payment_amount')), True).alias(
+            f'total_{method}_amount')
+                              for method in payment_methods]
+
+        pm_summary = (
+            pm_stats
+            .groupBy('driver_id')
+            .agg(*pivot_count_exprs, *pivot_amount_exprs)
+            .fillna(0)
+        )
+        # Combined customer statistics
+        combined_customer_stats = (
+            fares_trip_combined
+            .groupBy('driver_id')
+            .agg(round(F.sum('total_fareamount'), 2).alias('total_fareamount'),
+                 round(F.sum('tip_amount'), 2).alias('total_tip_amount'),
+                 round(F.avg('tip_pct'), 2).alias('avg_tip_pct'),
+                 round(F.sum('distance_km'), 2).alias('total_distance_km'),
+                 F.sum('trip_duration_min').alias('total_trip_duration_min'),
+                 F.count('trip_id').alias('total_trip_count'),
+                 round(F.avg('driver_rating'), 2).alias('avg_driver_rating'))
+        )
+        # Get distinct values for all pivot categories using DataFrame operations
+        pivot_categories = ['trip_status', 'trip_intention', 'pickup_period', 'pickup_day', 'pickup_month']
+        pivot_expressions = []
+
+        for category in pivot_categories:
+            # Get distinct values for this category
+            distinct_values_df = fares_trip_combined.select(category).distinct()
+            distinct_values = [row[category] for row in distinct_values_df.collect()]
+
+            # Create expressions for each value
+            for value in distinct_values:
+                expr = F.sum(
+                    F.when(col(category) == value, 1).otherwise(0)
+                ).alias(f"{category}_{value}_count")
+                pivot_expressions.append(expr)
+
+        # Add is_weather_extreme pivot
+        weather_values = [True, False]
+        for value in weather_values:
+            expr = F.sum(
+                F.when(col('is_weather_extreme') == value, 1).otherwise(0)
+            ).alias(f"weather_extreme_{str(value).lower()}_count")
+            pivot_expressions.append(expr)
+
+        # Single aggregation for all pivot counts
+        all_pivots = (
+            fares_trip_combined
+            .groupBy('driver_id')
+            .agg(*pivot_expressions)
+            .fillna(0)
+        )
+
+        # Join all data
+        final = driverdetails
+        final = final.join(combined_customer_stats, 'driver_id', 'inner')
+        final = final.join(pm_summary, 'driver_id', 'left')
+        final = final.join(all_pivots, 'driver_id', 'left')
+
+        # Null-safety: ensure metrics exist and no nulls
+        final = final.fillna({
+            'total_trip_count': 0,
+            'total_distance_km': 0.0,
+            'total_trip_duration_min': 0.0,
+            'tenure': 0.0,
+            'age': 0.0
+        })
+
+        # ---------------------------
+        # Compute percentiles for normalization (use 75th as "cap" reference)
+        # ---------------------------
+        # note: approxQuantile returns a list [q] for the column
+        # Use a small relative error (0.01) — tune if needed
+        # Protect against zero denominators by maxing with 1.0
+        def safe_quantile(df, colname, q=0.75):
+            qlist = df.approxQuantile(colname, [q], 0.01)
+            if not qlist or qlist[0] is None:
+                return 1.0
+            val = float(qlist[0])
+            return max(val, 1.0)
+
+        q_trips = safe_quantile(final, 'total_trip_count', 0.75)
+        q_distance = safe_quantile(final, 'total_distance_km', 0.75)
+        q_duration = safe_quantile(final, 'total_trip_duration_min', 0.75)
+        q_tenure = safe_quantile(final, 'tenure', 0.75)
+        q_age = safe_quantile(final, 'age', 0.75)
+
+        # convert to literals for efficient use in expressions
+        q_trips_lit = lit(q_trips)
+        q_distance_lit = lit(q_distance)
+        q_duration_lit = lit(q_duration)
+        q_tenure_lit = lit(q_tenure)
+        q_age_lit = lit(q_age)
+
+        # ---------------------------
+        # Normalise metrics to [0, 1] by capping at 75th percentile.
+        # If a driver >75th percentile, normalized value becomes >1; we cap to 1.
+        # ---------------------------
+        # Use least(col/quantile, 1.0) to cap at 1.0
+        final = final.withColumn(
+            'norm_trips',
+            F.least((col('total_trip_count') / q_trips_lit), lit(1.0))
+        ).withColumn(
+            'norm_distance',
+            F.least((col('total_distance_km') / q_distance_lit), lit(1.0))
+        ).withColumn(
+            'norm_duration',
+            F.least((col('total_trip_duration_min') / q_duration_lit), lit(1.0))
+        ).withColumn(
+            'norm_tenure',
+            F.least((col('tenure') / q_tenure_lit), lit(1.0))
+        ).withColumn(
+            'norm_age',
+            F.least((col('age') / q_age_lit), lit(1.0))
+        )
+
+        # ---------------------------
+        # Weighted experience score
+        # ---------------------------
+        w = self.weights
+        final = final.withColumn(
+            'experience_score',
+            (col('norm_trips') * lit(w['trips'])) +
+            (col('norm_distance') * lit(w['distance'])) +
+            (col('norm_duration') * lit(w['duration'])) +
+            (col('norm_tenure') * lit(w['tenure'])) +
+            (col('norm_age') * lit(w['age']))
+        )
+
+        # ---------------------------
+        # Bucketize experience_score into levels using score quantiles (data-driven)
+        # ---------------------------
+        # Compute quartiles of experience_score (driver-level)
+        score_quants = final.approxQuantile('experience_score', [0.25, 0.5, 0.75], 0.01)
+        # fallback if approxQuantile failed
+        if not score_quants or len(score_quants) < 3:
+            s25, s50, s75 = 0.25, 0.5, 0.75
+        else:
+            s25, s50, s75 = float(score_quants[0]), float(score_quants[1]), float(score_quants[2])
+
+        final = final.withColumn(
+            'experience_level',
+            when(col('experience_score') >= lit(s75), lit('Expert'))
+            .when(col('experience_score') >= lit(s50), lit('Advanced'))
+            .when(col('experience_score') >= lit(s25), lit('Intermediate'))
+            .otherwise(lit('Beginner'))
+        )
+
+        # Optional: keep only selected columns, or return as is
+        # columns_to_keep = ['driver_id', 'driver_name', 'age', 'tenure',
+        #                    'total_trip_count', 'total_distance_km', 'total_trip_duration_min',
+        #                    'experience_score', 'experience_level']
+        # final = final.select(*columns_to_keep)
+
+        return final
+
 
 class Harmonizer:
     _harmonizer_map = {
         "customerprofile": CustomerProfileHarmonizer,
-        "customerpreference" : CustomerPreferenceHarmonizer
+        "customerpreference" : CustomerPreferenceHarmonizer,
+        "driverprofile" : DriverProfileHarmonizer
     }
 
     def __init__(self, table, loadtype: str, runtype: str = 'dev'):
