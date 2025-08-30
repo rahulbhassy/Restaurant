@@ -10,7 +10,9 @@ def create_spark_session():
 
     # Initialize the Spark session
     spark = SparkSession.builder \
-        .appName("ML") \
+        .appName("Spark_Normal") \
+        .config("spark.sql.shuffle.partitions", "8") \
+        .config("spark.default.parallelism", "8") \
         .config("spark.jars",
                 "file:///C:/Spark/spark-3.4.4-bin-hadoop3/jars/delta-core_2.12-2.4.0.jar,"
                 "file:///C:/Users/HP/uber_project/config/mysql-connector-j-8.0.33.jar"
@@ -27,10 +29,12 @@ def create_spark_session():
 def create_spark_session_large():
 
     spark = SparkSession.builder \
-        .appName("ML") \
+        .appName("Spark_Large") \
         .master("local[4]") \
         .config("spark.driver.memory", "6g") \
         .config("spark.executor.memory", "4g") \
+        .config("spark.sql.shuffle.partitions","8") \
+        .config("spark.default.parallelism","8") \
         .config("spark.memory.fraction", "0.6") \
         .config("spark.memory.storageFraction", "0.4") \
         .config("spark.jars",
@@ -53,7 +57,9 @@ def create_spark_session_jdbc():
 
     # Initialize the Spark session
     spark = SparkSession.builder \
-        .appName("UberETL") \
+        .appName("Spark_JDBC") \
+        .config("spark.sql.shuffle.partitions", "8") \
+        .config("spark.default.parallelism", "8") \
         .config("spark.jars",
                 "file:///C:/Spark/spark-3.4.4-bin-hadoop3/jars/delta-core_2.12-2.4.0.jar,"
                 "file:///C:/Spark/spark-3.4.4-bin-hadoop3/jars/mssql-jdbc-12.10.1.jre11.jar"
@@ -77,10 +83,12 @@ def create_spark_session_sedona():
 
     # Initialize the Spark session
     spark = SparkSession.builder \
-        .appName("UberETL") \
+        .appName("Spark_Spatial") \
         .master("local[4]") \
         .config("spark.driver.memory", "6g") \
         .config("spark.executor.memory", "4g") \
+        .config("spark.sql.shuffle.partitions", "8") \
+        .config("spark.default.parallelism", "8") \
         .config("spark.memory.fraction", "0.6") \
         .config("spark.memory.storageFraction", "0.4") \
         .config("spark.jars",

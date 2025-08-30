@@ -41,9 +41,8 @@ def main(runtype: str = 'prod'):
     generator = DataGenerator(fake, max_customer_id, max_driver_id)
 
     # Generate new customers and drivers first
-    new_customers = generator.generate_new_customers(200)
-    new_drivers = generator.generate_new_drivers(15
-                                                 )
+    new_customers = generator.generate_new_customers(100)
+    new_drivers = generator.generate_new_drivers(2)
 
     # Get all driver IDs (existing + new)
     new_driver_ids = [d['driver_id'] for d in new_drivers]
