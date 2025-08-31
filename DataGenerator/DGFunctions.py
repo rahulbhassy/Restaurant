@@ -550,8 +550,8 @@ class TripGenerator:
                 'tip_amount': tip_amount,
                 'payment_method': random.choice(payment_methods),
                 'trip_status': random.choice(trip_statuses),
-                'customer_rating': random.choice([None,2.5,2,1.5,1, 3,3,3.5,3.5,3.5,4, 4.5, 4, 5, 5, 5]),
-                'driver_rating': random.choice([None,2.5,2,1.5,1, 3,3,3.5,3.5,3.5,4, 4.5, 4, 5, 5, 5]),
+                'customer_rating': random.choice([None,2.5,2,1.5,1, 3,3,3.5,4, 4.5,4.5,4.5,4.5,4.5,4.5,4.5,4.5, 4, 5, 5, 5, 5,5 ,5 ,5 ,5, 5, 5]),
+                'driver_rating': random.choice([None,2.5,2,1.5,1, 3,3,3.5,4, 4.5,4.5,4.5,4.5,4.5,4.5,4.5,4.5, 4, 5, 5, 5, 5,5 ,5 ,5 ,5, 5, 5]),
                 'trip_intention': intention
             })
 
