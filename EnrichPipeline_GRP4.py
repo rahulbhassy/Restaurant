@@ -6,7 +6,7 @@ from EnrichPeople.NoteBooks import Process_PeopleTables_Refresh
 
 @task(name="Enrich_DriverProfile_Table", tags=["enrich", "people", "driverprofile"])
 def enrich_profile_table_task(table: str, loadtype: str, runtype: str = 'prod',initial_load: str = 'no'):
-    """Task to enrich Uber data with people information"""
+    """Task to enrich Uber data with people information """
     logger = get_run_logger()
     logger.info("Processing Driver Profile")
     Process_PeopleTables_Refresh.main(
