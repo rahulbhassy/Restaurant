@@ -1,8 +1,9 @@
-from typing import List
+
 from prefect import flow, task
 from prefect_dask.task_runners import DaskTaskRunner
 from prefect import get_run_logger
 from EnrichPeople.NoteBooks import Process_PeopleTables_Refresh
+from PowerBIRefresh_Pipeline import powerbirefresh_flow
 
 @task(name="Enrich_DriverProfile_Table", tags=["enrich", "people", "driverprofile"])
 def enrich_profile_table_task(table: str, loadtype: str, runtype: str = 'prod',initial_load: str = 'no'):
@@ -63,12 +64,24 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
         runtype=runtype,
         initial_load=initial_load
     )
+    downstream_dependencies = [enrich_profile_table_task]
     enrich_preference_table_task(
         table='driverpreference',
         loadtype=load_type,
         runtype=runtype,
         initial_load=initial_load,
-        wait_for=[enrich_profile_table_task]
+        wait_for=downstream_dependencies
+    )
+    downstream_dependencies.append(enrich_salary_table_task)
+    downstream_dependencies.append(enrich_preference_table_task)
+
+    logger.info("Starting PowerBI Refresh")
+
+    powerbirefresh_flow(
+        configname=['driverprofile','driverpreference','driversalary'],
+        loadtype=load_type,
+        runtype=runtype,
+        wait_for=downstream_dependencies
     )
 
 if __name__ == "__main__":
