@@ -8,7 +8,7 @@ from Shared.FileIO import SparkTableViewer
 
 
 setVEnv()
-table = "customerprofile"
+table = "driverpreference"
 loadtype = 'full'
 runtype = 'prod'
 initial_load = 'yes'
@@ -46,8 +46,7 @@ destination_data = harmonizer.harmonize(
     dataframes=dataframes,
     currentio=currentio
 )
-viewer = SparkTableViewer(df=destination_data)
-viewer.display()
+
 datawriter = DataWriter(
     loadtype=loadtype,
     path=currentio.filepath(),

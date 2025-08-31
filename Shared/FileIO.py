@@ -122,7 +122,7 @@ class IntermediateIO:
     _TABLES = frozenset([
         "uberfares", "tripdetails", "driverdetails", "weatherimpact", "balancingresults" , "BalancingResults",
         "customerdetails", "vehicledetails", "uber","features", "weatherdetails" , "fares" , "timeseries",
-        "customerprofile","driverprofile","customerpreference"
+        "customerprofile","driverprofile","customerpreference","driverpreference"
     ])
 
     def __init__(self, fullpath: str, date: str = None):
