@@ -13,7 +13,7 @@ from pyspark.sql.functions import avg, col, lit , round
 from Balancing.config import SCHEMA
 
 setVEnv()
-table = 'vehicledetails'
+table = 'fares'
 spark = create_spark_session()
 loadtype = 'full'
 
@@ -21,7 +21,7 @@ balancingio = DataLakeIO(
     process='read',
     table=table,
     state='current',
-    layer='raw',
+    layer='enrich',
     loadtype=loadtype
 )
 

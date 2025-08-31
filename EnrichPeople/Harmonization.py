@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, round, regexp_replace
 from pyspark.sql.window import Window
-from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when
+from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when , year
 
 class CustomerProfileHarmonizer:
     def __init__(self, loadtype: str, runtype: str = 'dev'):
@@ -43,8 +43,9 @@ class CustomerProfileHarmonizer:
 
         fares = (
             dataframes['fares']
+            .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
             .select('trip_id', 'distance_km', 'trip_duration_min', 'tip_amount',
-                    'total_fareamount', 'tip_pct', 'pickup_month', 'pickup_day',
+                    'total_fareamount', 'tip_pct', 'pickup_month', 'pickup_day', 'year',
                     clean_col('pickup_period').alias('pickup_period'),
                     'is_weather_extreme')
         )
@@ -92,7 +93,7 @@ class CustomerProfileHarmonizer:
         )
 
         # Get distinct values for all pivot categories using DataFrame operations
-        pivot_categories = ['trip_status', 'trip_intention', 'pickup_period', 'pickup_day', 'pickup_month']
+        pivot_categories = ['trip_status', 'trip_intention', 'pickup_period', 'pickup_day', 'pickup_month','year']
         pivot_expressions = []
 
         for category in pivot_categories:
@@ -363,8 +364,9 @@ class DriverProfileHarmonizer:
 
         fares = (
             dataframes['fares']
+            .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
             .select('trip_id', 'distance_km', 'trip_duration_min', 'tip_amount',
-                    'total_fareamount', 'tip_pct', 'pickup_month', 'pickup_day',
+                    'total_fareamount', 'tip_pct', 'pickup_month', 'pickup_day', 'year',
                     clean_col('pickup_period').alias('pickup_period'),
                     'is_weather_extreme')
         )
@@ -407,7 +409,7 @@ class DriverProfileHarmonizer:
                  round(F.avg('driver_rating'), 2).alias('avg_driver_rating'))
         )
         # Get distinct values for all pivot categories using DataFrame operations
-        pivot_categories = ['trip_status', 'trip_intention', 'pickup_period', 'pickup_day', 'pickup_month']
+        pivot_categories = ['trip_status', 'trip_intention', 'pickup_period', 'pickup_day', 'pickup_month','year']
         pivot_expressions = []
 
         for category in pivot_categories:
@@ -532,14 +534,14 @@ class DriverProfileHarmonizer:
             .when(col('experience_score') >= lit(s25), lit('Intermediate'))
             .otherwise(lit('Beginner'))
         )
-
-        # Optional: keep only selected columns, or return as is
-        # columns_to_keep = ['driver_id', 'driver_name', 'age', 'tenure',
-        #                    'total_trip_count', 'total_distance_km', 'total_trip_duration_min',
-        #                    'experience_score', 'experience_level']
-        # final = final.select(*columns_to_keep)
-
-        return final
+        return final.drop(
+            "norm_trips",
+            "norm_distance",
+            "norm_duration",
+            "norm_tenure",
+            "norm_age",
+            "experience_score"
+        )
 
 
 class Harmonizer:

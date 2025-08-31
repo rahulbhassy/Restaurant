@@ -8,7 +8,7 @@ from Shared.FileIO import SparkTableViewer
 
 
 setVEnv()
-table = "driverprofile"
+table = "customerprofile"
 loadtype = 'full'
 runtype = 'prod'
 initial_load = 'yes'
@@ -54,7 +54,7 @@ datawriter = DataWriter(
     spark=spark,
     format='delta'
 )
-'''
+
 if initial_load == 'yes':
     datawriter.WriteData(df=destination_data)
 else:
@@ -65,5 +65,4 @@ else:
         key_columns= keys.get(table)
     )
     mergeconfig.merge(spark=spark,updated_df=destination_data)
-'''
 stop_spark(spark=spark)
