@@ -42,7 +42,7 @@ def main(runtype: str = 'prod'):
 
     # Generate new customers and drivers first
     new_customers = generator.generate_new_customers(100)
-    new_drivers = generator.generate_new_drivers(2)
+    new_drivers = generator.generate_new_drivers(5)
 
     # Get all driver IDs (existing + new)
     new_driver_ids = [d['driver_id'] for d in new_drivers]
