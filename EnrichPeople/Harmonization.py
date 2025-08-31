@@ -2,9 +2,9 @@ from typing import List, Optional
 from Shared.FileIO import DataLakeIO
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.functions import col, round, regexp_replace
+from pyspark.sql.functions import count , concat_ws
 from pyspark.sql.window import Window
-from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when , year
+from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when , year, month , avg , sum , round
 
 class CustomerProfileHarmonizer:
     def __init__(self, loadtype: str, runtype: str = 'dev'):
@@ -730,12 +730,98 @@ class DriverPreferenceHarmonizer:
             avg_driver_rating, 'driver_id', 'left'
         )
 
+class DriverSalaryHarmonizer:
+    def __init__(self, loadtype: str, runtype: str = 'dev'):
+        self.loadtype = 'full'
+        self.runtype = runtype
+
+    @staticmethod
+    def _round_avg_columns(df: DataFrame) -> DataFrame:
+        """Rounds all columns containing 'month' in their name to 2 decimal places."""
+        # Identify columns with 'avg' in their name
+        avg_cols = [col_name for col_name in df.columns if 'month' in col_name]
+        # Apply rounding only to identified columns
+        if avg_cols:
+            rounding_exprs = [
+                round(col(col_name), 2).alias(col_name)
+                if col_name in avg_cols
+                else col(col_name)
+                for col_name in df.columns
+            ]
+            return df.select(*rounding_exprs)
+        return df
+
+    def harmonize(self, spark: SparkSession, dataframes: dict, currentio: Optional[DataLakeIO]):
+        driverdetails = dataframes.get('driverdetails').select('driver_id','driver_name')
+        fares = (dataframes.get('fares')
+        .withColumn(
+            "earned_salary",
+            0.7 * col("fare_amount") + col("tip_amount")
+        ).withColumn(
+            "commission_amount",
+            0.3 * col("fare_amount")
+        )
+        .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
+        .withColumn("month", month(to_date(col("date"), "yyyy-MM-dd")))
+        .select(
+            'trip_id',
+            'date',
+            'distance_km',
+            'trip_duration_min',
+            'fare_amount',
+            'tip_amount',
+            'fare_per_km',
+            'fare_per_min',
+            'earned_salary',
+            'commission_amount',
+            'year',
+            'month'
+        ))
+        tripdetails = dataframes.get('tripdetails').select('trip_id','driver_id')
+
+        combined_ft = fares.join(
+            tripdetails,
+            on=['trip_id'],
+            how='inner'
+        )
+        grouped_earnings = combined_ft.groupBy(
+            'driver_id',
+            'year',
+            'month'
+        ).agg(
+            avg('fare_per_km').alias('avg_fare_per_km_month'),
+            avg('fare_per_min').alias('avg_fare_per_min_month'),
+            count('trip_id').alias('trip_count_month'),
+            sum('distance_km').alias('distance_km_month'),
+            sum('trip_duration_min').alias('trip_duration_min_month'),
+            sum('earned_salary').alias('earned_salary_month'),
+            sum('commission_amount').alias('commission_amount_month')
+        ).withColumn(
+            'salary_key',
+            concat_ws(
+                '-',
+                'driver_id','year','month'
+            )
+        ).select('*')
+
+        return self._round_avg_columns(grouped_earnings.join(
+            driverdetails,
+            on=['driver_id'],
+            how='left'
+        ).select(
+            'salary_key', 'driver_name','driver_id',
+            'year', 'month', 'avg_fare_per_km_month',
+            'avg_fare_per_min_month', 'trip_count_month','distance_km_month',
+            'trip_duration_min_month', 'earned_salary_month', 'commission_amount_month',
+        ))
+
 class Harmonizer:
     _harmonizer_map = {
         "customerprofile": CustomerProfileHarmonizer,
         "customerpreference" : CustomerPreferenceHarmonizer,
         "driverprofile" : DriverProfileHarmonizer,
-        "driverpreference" : DriverPreferenceHarmonizer
+        "driverpreference" : DriverPreferenceHarmonizer,
+        "driversalary" : DriverSalaryHarmonizer
     }
 
     def __init__(self, table, loadtype: str, runtype: str = 'dev'):

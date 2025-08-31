@@ -4,11 +4,10 @@ from Shared.FileIO import SourceObjectAssignment , DataLakeIO , MergeIO
 from Shared.DataWriter import DataWriter
 from EnrichPeople.Harmonization import Harmonizer
 from Shared.pyspark_env import setVEnv , stop_spark
-from Shared.FileIO import SparkTableViewer
 
 
 setVEnv()
-table = "driverpreference"
+table = "driversalary"
 loadtype = 'full'
 runtype = 'prod'
 initial_load = 'yes'
@@ -64,4 +63,5 @@ else:
         key_columns= keys.get(table)
     )
     mergeconfig.merge(spark=spark,updated_df=destination_data)
+
 stop_spark(spark=spark)
