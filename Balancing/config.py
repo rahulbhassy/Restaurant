@@ -11,7 +11,10 @@ layer = {
     "weatherimpact": "enrich",
     "uberfaresenrich": "enrich",
     "customerprofile": "enrich",
-    "customerpreference" : "enrich"
+    "customerpreference" : "enrich",
+    "driverpreference": "enrich",
+    "driverprofile": "enrich",
+    "driversalary": "enrich"
 }
 
 SCHEMA = StructType([
@@ -94,6 +97,53 @@ CHECKS = {
             SELECT COUNT(c.customer_id) AS expected_count FROM delta.`{customerprofile}` c INNER JOIN combined ft ON c.customer_id = ft.customer_id
         """,
         "targetquery": "SELECT COUNT(customer_id) AS actual_count FROM delta.`{customerpreference}`"
+    },
+    "driverprofile":{
+        "tables" : ["driverdetails","fares","tripdetails"],
+        "sourcequery": """
+            WITH fares_trip AS (
+                SELECT t.driver_id AS driver_id FROM delta.`{tripdetails}` t 
+                INNER JOIN delta.`{fares}` f ON f.trip_id = t.trip_id
+                GROUP BY t.driver_id
+            )
+            SELECT COUNT(c.driver_id) AS expected_count FROM delta.`{driverdetails}` c INNER JOIN fares_trip ft ON c.driver_id = ft.driver_id
+                """,
+        "targetquery": "SELECT COUNT(driver_id) AS actual_count FROM delta.`{driverprofile}`"
+    },
+    "driverpreference": {
+        "tables": ["driverprofile", "fares", "tripdetails", "uberfares"],
+        "sourcequery": """
+        WITH combined AS (
+            SELECT t.driver_id AS driver_id FROM delta.`{tripdetails}` t 
+            INNER JOIN delta.`{fares}` f ON f.trip_id = t.trip_id
+            INNER JOIN delta.`{uberfares}` u ON u.trip_id = t.trip_id
+            GROUP BY t.driver_id
+        )
+        SELECT COUNT(c.driver_id) AS expected_count FROM delta.`{driverprofile}` c INNER JOIN combined ft ON c.driver_id = ft.driver_id
+    """,
+        "targetquery": "SELECT COUNT(driver_id) AS actual_count FROM delta.`{driverpreference}`"
+    },
+    "driversalary" : {
+        "tables": ["tripdetails","fares"],
+        "sourcequery":"""
+            WITH fares_trip AS (
+                SELECT t.driver_id AS driver_id , 
+                YEAR(TO_DATE(date,'yyyy-MM-dd')) AS year,
+                MONTH(TO_DATE(date,'yyyy-MM-dd')) AS month
+                FROM delta.`{tripdetails}` t 
+                INNER JOIN delta.`{fares}` f ON f.trip_id = t.trip_id
+            )
+            SELECT COUNT(*) AS expected_count
+            FROM (
+                SELECT driver_id, year, month
+                FROM fares_trip
+                GROUP BY driver_id, year, month
+            )
+        """,
+        "targetquery" : """
+            SELECT COUNT(salary_key) AS actual_count FROM delta.`{driversalary}` 
+        """
     }
+
 
 }

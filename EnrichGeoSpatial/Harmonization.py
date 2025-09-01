@@ -127,6 +127,7 @@ class Harmonizer:
                 col("d.borough").alias("dropoff_borough")
             )
         )
+        b_df.unpersist()
 #hi
         print("Splitting data by borough completeness")
         full_enriched_uber = enriched_uber.filter(

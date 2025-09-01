@@ -5,6 +5,7 @@ from prefect import get_run_logger
 from Enrich_PipelineGRP1 import enrich_grp1_processing_flow
 from Enrich_PipelineGRP2 import enrich_grp2_processing_flow
 from Enrich_PipelineGRP3 import enrich_grp3_processing_flow
+from Enrich_PipelineGRP4 import enrich_grp4_processing_flow
 
 
 @flow(
@@ -39,6 +40,12 @@ def enrich_processing_flow(load_type: str,runtype: str = 'prod'):
         initial_load='yes',
         wait_for=downstream_dependencies
 
+    )
+    enrich_grp4_processing_flow(
+        load_type='full',
+        runtype=runtype,
+        initial_load='yes',
+        wait_for=downstream_dependencies
     )
 
 

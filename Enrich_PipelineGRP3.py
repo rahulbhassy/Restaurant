@@ -30,8 +30,8 @@ def enrich_preference_tables_task(table: str, loadtype: str, runtype: str = 'pro
         initial_load=initial_load
     )
 
-@task(name="Load_Balancing_EnrichGRP2", tags=["balancing", "etl"])
-def load_balancing_enrichgrp2_task(load_type: str,tables: List[str],runtype: str = 'prod'):
+@task(name="Load_Balancing_EnrichGRP3", tags=["balancing", "etl"])
+def load_balancing_enrichgrp3_task(load_type: str,tables: List[str],runtype: str = 'prod'):
     """Task to process balancing results"""
     Process_Balancing.main(
         runtype=runtype,
@@ -68,13 +68,13 @@ def enrich_grp3_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     )
     downstream_dependencies.append(enrich_preference_tables_task)
 
-    load_balancing_enrichgrp2_task(
+    load_balancing_enrichgrp3_task(
         load_type='full',
         tables=['customerprofile','customerpreference'],
         runtype=runtype,
         wait_for=downstream_dependencies
     )
-    downstream_dependencies.append(load_balancing_enrichgrp2_task)
+    downstream_dependencies.append(load_balancing_enrichgrp3_task)
 
     logger.info("Starting PowerBI Refresh")
 

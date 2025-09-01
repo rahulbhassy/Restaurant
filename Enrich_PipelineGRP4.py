@@ -1,9 +1,10 @@
-
+from typing import List
 from prefect import flow, task
 from prefect_dask.task_runners import DaskTaskRunner
 from prefect import get_run_logger
 from EnrichPeople.NoteBooks import Process_PeopleTables_Refresh
 from PowerBIRefresh_Pipeline import powerbirefresh_flow
+from Balancing.NoteBooks import Process_Balancing
 
 @task(name="Enrich_DriverProfile_Table", tags=["enrich", "people", "driverprofile"])
 def enrich_profile_table_task(table: str, loadtype: str, runtype: str = 'prod',initial_load: str = 'no'):
@@ -41,6 +42,16 @@ def enrich_salary_table_task(table: str, loadtype: str, runtype: str = 'prod',in
         initial_load=initial_load
     )
 
+@task(name="Load_Balancing_EnrichGRP2", tags=["balancing", "etl"])
+def load_balancing_enrichgrp4_task(load_type: str,tables: List[str],runtype: str = 'prod'):
+    """Task to process balancing results"""
+    Process_Balancing.main(
+        runtype=runtype,
+        loadtype=load_type,
+        tables=tables
+    )
+
+
 @flow(
     name="Enrich_Uber_GRP4_Processing_Pipeline",
     task_runner=DaskTaskRunner(),  # Remove for sequential execution
@@ -74,6 +85,14 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     )
     downstream_dependencies.append(enrich_salary_table_task)
     downstream_dependencies.append(enrich_preference_table_task)
+
+    load_balancing_enrichgrp4_task(
+        load_type='full',
+        tables=['driverprofile','driverpreference','driversalary'],
+        runtype=runtype,
+        wait_for=downstream_dependencies
+    )
+    downstream_dependencies.append(load_balancing_enrichgrp4_task)
 
     logger.info("Starting PowerBI Refresh")
 
