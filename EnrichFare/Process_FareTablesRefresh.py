@@ -6,7 +6,7 @@ from EnrichFare.Harmonization import Harmonizer
 from EnrichFare.Config import config, layer
 
 setVEnv()
-table = 'timeseries'
+table = 'fares'
 loadtype = 'full'
 runtype = 'prod'
 spark = create_spark_session_jdbc() if table == 'timeseries' else create_spark_session()

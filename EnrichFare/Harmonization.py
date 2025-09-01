@@ -113,6 +113,10 @@ class FareHarmonizer:
                 "trip_duration_min",
                 (unix_timestamp(col("u.dropoff_datetime")) - unix_timestamp(col("u.pickup_datetime"))) / 60.0
             ).withColumn(
+                "avg_speed_kmph",
+                when(col("trip_duration_min") > 0, (col("distance_km") * 60) / col("trip_duration_min"))
+                .otherwise(None)
+            ).withColumn(
                 "fare_per_km",
                 when(
                     col("distance_km") > 0,
@@ -177,6 +181,7 @@ class FareHarmonizer:
                 col("u.dropoff_datetime"),
                 col("u.distance_km"),
                 "trip_duration_min",
+                round(col("avg_speed_kmph"),2).alias("avg_speed_kmph"),
                 col("u.fare_amount"),
                 col("t.tip_amount"),
                 round(col("fare_per_km"), 2).alias("fare_per_km"),
