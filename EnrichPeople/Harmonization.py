@@ -750,7 +750,10 @@ class DriverSalaryHarmonizer:
             ]
             return df.select(*rounding_exprs)
         return df
+    def _getexpecteddetails(self,fares: DataFrame):
+        return fares.groupBy(
 
+        )
     def harmonize(self, spark: SparkSession, dataframes: dict, currentio: Optional[DataLakeIO]):
         driverdetails = dataframes.get('driverdetails').select('driver_id','driver_name')
         fares = (dataframes.get('fares')
@@ -763,20 +766,7 @@ class DriverSalaryHarmonizer:
         )
         .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
         .withColumn("month", month(to_date(col("date"), "yyyy-MM-dd")))
-        .select(
-            'trip_id',
-            'date',
-            'distance_km',
-            'trip_duration_min',
-            'fare_amount',
-            'tip_amount',
-            'fare_per_km',
-            'fare_per_min',
-            'earned_salary',
-            'commission_amount',
-            'year',
-            'month'
-        ))
+        )
         tripdetails = dataframes.get('tripdetails').select('trip_id','driver_id')
 
         combined_ft = fares.join(
