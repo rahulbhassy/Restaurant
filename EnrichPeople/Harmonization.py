@@ -729,81 +729,186 @@ class DriverPreferenceHarmonizer:
         ).join(
             avg_driver_rating, 'driver_id', 'left'
         )
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+from typing import Optional
+import builtins  # For using Python's built-in abs and round functions
 
-class DriverSalaryHarmonizer:
-    def __init__(self, loadtype: str, runtype: str = 'dev'):
+
+class DriverPerformanceHarmonizer:
+    def __init__(self, loadtype: str, runtype: str = 'dev',
+                 time_buffer: float = 0.05, fare_buffer: float = 0.10,
+                 on_time_threshold: float = 0.8,
+                 speed_deviation_threshold: float = -0.1,
+                 low_rating_threshold: float = 3.0,
+                 penalty_per_low_rating: float = 5.0,
+                 penalty_per_speed_deviation: float = 10.0,
+                 base_penalty_amount: float = 50.0):
         self.loadtype = 'full'
         self.runtype = runtype
+        self.time_buffer = time_buffer
+        self.fare_buffer = fare_buffer
+        self.on_time_threshold = on_time_threshold
+        self.speed_deviation_threshold = speed_deviation_threshold
+        self.low_rating_threshold = low_rating_threshold
+        self.penalty_per_low_rating = penalty_per_low_rating
+        self.penalty_per_speed_deviation = penalty_per_speed_deviation
+        self.base_penalty_amount = base_penalty_amount
 
     @staticmethod
     def _round_avg_columns(df: DataFrame) -> DataFrame:
         """Rounds all columns containing 'month' in their name to 2 decimal places."""
-        # Identify columns with 'avg' in their name
         avg_cols = [col_name for col_name in df.columns if 'month' in col_name]
-        # Apply rounding only to identified columns
         if avg_cols:
             rounding_exprs = [
-                round(col(col_name), 2).alias(col_name)
-                if col_name in avg_cols
-                else col(col_name)
+                round(col(col_name), 2).alias(col_name) if col_name in avg_cols else col(col_name)
                 for col_name in df.columns
             ]
             return df.select(*rounding_exprs)
         return df
-    def _getexpecteddetails(self,fares: DataFrame):
+
+    def _getexpecteddetails(self, fares: DataFrame):
         return fares.groupBy(
-
-        )
-    def harmonize(self, spark: SparkSession, dataframes: dict, currentio: Optional[DataLakeIO]):
-        driverdetails = dataframes.get('driverdetails').select('driver_id','driver_name')
-        fares = (dataframes.get('fares')
-        .withColumn(
-            "earned_salary",
-            0.7 * col("fare_amount") + col("tip_amount")
-        ).withColumn(
-            "commission_amount",
-            0.3 * col("fare_amount")
-        )
-        .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
-        .withColumn("month", month(to_date(col("date"), "yyyy-MM-dd")))
-        )
-        tripdetails = dataframes.get('tripdetails').select('trip_id','driver_id')
-
-        combined_ft = fares.join(
-            tripdetails,
-            on=['trip_id'],
-            how='inner'
-        )
-        grouped_earnings = combined_ft.groupBy(
-            'driver_id',
+            'pickup_borough',
+            'dropoff_borough',
+            'pickup_period',
             'year',
-            'month'
+            'is_weather_extreme'
         ).agg(
+            round(avg(col('avg_speed_kmph')), 2).alias('expected_avg_speed_kmph'),
+            round(avg(col('trip_duration_min')), 2).alias('expected_trip_duration_min'),
+            round(avg(col('fare_per_km')), 2).alias('expected_fare_per_km'),
+            round(avg(col('fare_per_min')), 2).alias('expected_fare_per_min')
+        )
+
+    def _calculate_penalty(self, on_time_rate, low_ratings_count, avg_speed_deviation_pct):
+        """Calculate penalty amount based on performance metrics using regular Python operations."""
+        penalty = 0.0
+
+        # Penalty for poor on-time performance
+        if on_time_rate is not None and on_time_rate < self.on_time_threshold:
+            penalty += self.base_penalty_amount
+
+        # Penalty for low ratings
+        if low_ratings_count is not None:
+            penalty += low_ratings_count * self.penalty_per_low_rating
+
+        # Penalty for speed deviation below threshold
+        if (avg_speed_deviation_pct is not None and
+                avg_speed_deviation_pct < self.speed_deviation_threshold):
+            # Use Python's built-in abs function
+            deviation_below_threshold = builtins.abs(avg_speed_deviation_pct - self.speed_deviation_threshold) * 100
+            penalty += deviation_below_threshold * self.penalty_per_speed_deviation
+
+        # Use Python's built-in round to avoid shadowing by pyspark.round
+        return float(builtins.round(penalty, 2))
+
+    def harmonize(self, spark: SparkSession, dataframes: dict, currentio: Optional[DataLakeIO]):
+        driverdetails = dataframes.get('driverdetails').select('driver_id', 'driver_name')
+        fares = (dataframes.get('fares')
+                 .withColumn("earned_salary", 0.7 * col("fare_amount") + col("tip_amount"))
+                 .withColumn("commission_amount", 0.3 * col("fare_amount"))
+                 .withColumn("year", year(to_date(col("date"), "yyyy-MM-dd")))
+                 .withColumn("month", month(to_date(col("date"), "yyyy-MM-dd")))
+                 )
+
+        # Using driver_rating instead of rating
+        tripdetails = dataframes.get('tripdetails').select('trip_id', 'driver_id', 'driver_rating')
+
+        # Compute expected details and join to fares
+        expected_details = self._getexpecteddetails(fares.select(
+            'pickup_borough', 'dropoff_borough', 'pickup_period', 'year', 'is_weather_extreme',
+            'avg_speed_kmph', 'trip_duration_min', 'fare_per_km', 'fare_per_min'
+        ))
+        fares_with_expected = fares.join(
+            expected_details,
+            on=['pickup_borough', 'dropoff_borough', 'pickup_period', 'year', 'is_weather_extreme'],
+            how='left'
+        )
+
+        # Calculate performance metrics with buffers
+        fares_with_metrics = fares_with_expected.withColumn(
+            "on_time",
+            (col("trip_duration_min") >= col("expected_trip_duration_min") * (1 - self.time_buffer)) &
+            (col("trip_duration_min") <= col("expected_trip_duration_min") * (1 + self.time_buffer))
+        ).withColumn(
+            "avg_speed_deviation",
+            col("avg_speed_kmph") - col("expected_avg_speed_kmph")
+        ).withColumn(
+            "avg_speed_deviation_pct",
+            when(col("expected_avg_speed_kmph") != 0,
+                 (col("avg_speed_kmph") - col("expected_avg_speed_kmph")) / col("expected_avg_speed_kmph")
+                 ).otherwise(0)
+        ).withColumn(
+            "is_fare_per_km_matching",
+            (col("fare_per_km") >= col("expected_fare_per_km") * (1 - self.fare_buffer)) &
+            (col("fare_per_km") <= col("expected_fare_per_km") * (1 + self.fare_buffer))
+        ).withColumn(
+            "is_fare_per_min_matching",
+            (col("fare_per_min") >= col("expected_fare_per_min") * (1 - self.fare_buffer)) &
+            (col("fare_per_min") <= col("expected_fare_per_min") * (1 + self.fare_buffer))
+        )
+
+        # Join with trip details to get driver_id and driver_rating per trip
+        combined_ft = fares_with_metrics.join(tripdetails, on='trip_id', how='inner')
+
+        # Identify low ratings using driver_rating
+        combined_ft = combined_ft.withColumn(
+            "is_low_rating",
+            col("driver_rating") < self.low_rating_threshold
+        )
+
+        # Aggregate metrics by driver and month
+        grouped_earnings = combined_ft.groupBy('driver_id', 'year', 'month').agg(
             avg('fare_per_km').alias('avg_fare_per_km_month'),
             avg('fare_per_min').alias('avg_fare_per_min_month'),
             count('trip_id').alias('trip_count_month'),
             sum('distance_km').alias('distance_km_month'),
             sum('trip_duration_min').alias('trip_duration_min_month'),
             sum('earned_salary').alias('earned_salary_month'),
-            sum('commission_amount').alias('commission_amount_month')
+            sum('commission_amount').alias('commission_amount_month'),
+            # Calculate monthly rates and averages for new metrics
+            avg(col('on_time').cast('integer')).alias('on_time_rate_month'),
+            avg('avg_speed_deviation').alias('avg_speed_deviation_month'),
+            avg('avg_speed_deviation_pct').alias('avg_speed_deviation_pct_month'),
+            avg(col('is_fare_per_km_matching').cast('integer')).alias('fare_per_km_match_rate_month'),
+            avg(col('is_fare_per_min_matching').cast('integer')).alias('fare_per_min_match_rate_month'),
+            sum(col('is_low_rating').cast('integer')).alias('low_ratings_count_month')
         ).withColumn(
             'salary_key',
-            concat_ws(
-                '-',
-                'driver_id','year','month'
-            )
-        ).select('*')
+            concat_ws('-', 'driver_id', 'year', 'month')
+        )
 
-        return self._round_avg_columns(grouped_earnings.join(
-            driverdetails,
-            on=['driver_id'],
-            how='left'
+        # Create UDF for penalty calculation (keeps logic in Python but avoids the round name-shadowing issue)
+        penalty_udf = udf(self._calculate_penalty, DoubleType())
+
+        grouped_earnings = grouped_earnings.withColumn(
+            "penalty_amount_month",
+            penalty_udf(
+                col("on_time_rate_month"),
+                col("low_ratings_count_month"),
+                col("avg_speed_deviation_pct_month")
+            )
+        ).withColumn(
+            "adjusted_earned_salary_month",
+            col("earned_salary_month") - col("penalty_amount_month")
+        )
+
+        # Join with driver details and round average columns
+        result = self._round_avg_columns(
+            grouped_earnings.join(driverdetails, on='driver_id', how='left')
         ).select(
-            'salary_key', 'driver_name','driver_id',
-            'year', 'month', 'avg_fare_per_km_month',
-            'avg_fare_per_min_month', 'trip_count_month','distance_km_month',
-            'trip_duration_min_month', 'earned_salary_month', 'commission_amount_month',
-        ))
+            'salary_key', 'driver_name', 'driver_id', 'year', 'month',
+            'avg_fare_per_km_month', 'avg_fare_per_min_month', 'trip_count_month',
+            'distance_km_month', 'trip_duration_min_month', 'earned_salary_month',
+            'commission_amount_month', 'on_time_rate_month', 'avg_speed_deviation_month',
+            'avg_speed_deviation_pct_month', 'fare_per_km_match_rate_month',
+            'fare_per_min_match_rate_month', 'low_ratings_count_month',
+            'penalty_amount_month', 'adjusted_earned_salary_month'
+        )
+
+        return result
 
 class Harmonizer:
     _harmonizer_map = {
@@ -811,7 +916,7 @@ class Harmonizer:
         "customerpreference" : CustomerPreferenceHarmonizer,
         "driverprofile" : DriverProfileHarmonizer,
         "driverpreference" : DriverPreferenceHarmonizer,
-        "driversalary" : DriverSalaryHarmonizer
+        "driverperformance" : DriverPerformanceHarmonizer
     }
 
     def __init__(self, table, loadtype: str, runtype: str = 'dev'):

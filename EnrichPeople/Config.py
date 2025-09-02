@@ -3,7 +3,7 @@ config = {
     "customerpreference" : ["customerprofile","fares","tripdetails","uberfares"],
     "driverprofile" : ["driverdetails","fares","tripdetails","vehicledetails"],
     "driverpreference" : ["driverprofile","fares","tripdetails","uberfares"],
-    "driversalary" : ["driverdetails","fares","tripdetails"]
+    "driverperformance" : ["driverdetails","fares","tripdetails"]
 }
 layer = {
     "customerdetails" : "raw",
@@ -16,7 +16,7 @@ layer = {
     "driverpreference" : "enrich",
     "uberfares" : "raw",
     "vehicledetails": "raw",
-    "driversalary" : "enrich"
+    "driverperformance" : "enrich"
 }
 
 keys = {
@@ -24,7 +24,7 @@ keys = {
     "driverprofile" : ["driver_id"],
     "customerpreference" : ["customer_id"],
     "driverpreference" : ["driver_id"],
-    "driversalary" : ["salary_key"]
+    "driverperformance" : ["salary_key"]
 }
 
 updateitems = {
