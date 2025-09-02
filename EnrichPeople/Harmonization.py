@@ -729,6 +729,8 @@ class DriverPreferenceHarmonizer:
         ).join(
             avg_driver_rating, 'driver_id', 'left'
         )
+
+
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
@@ -883,6 +885,7 @@ class DriverPerformanceHarmonizer:
         # Create UDF for penalty calculation (keeps logic in Python but avoids the round name-shadowing issue)
         penalty_udf = udf(self._calculate_penalty, DoubleType())
 
+        # Compute raw penalty using UDF
         grouped_earnings = grouped_earnings.withColumn(
             "penalty_amount_month",
             penalty_udf(
@@ -890,9 +893,24 @@ class DriverPerformanceHarmonizer:
                 col("low_ratings_count_month"),
                 col("avg_speed_deviation_pct_month")
             )
+        )
+
+        # CAP: penalty should not exceed 50% of earned salary.
+        # Use least() to pick the minimum between computed penalty and 0.5 * earned_salary_month,
+        # then round the capped value to 2 decimals using pyspark round.
+        grouped_earnings = grouped_earnings.withColumn(
+            "penalty_amount_month",
+            round(least(col("penalty_amount_month"), col("earned_salary_month") * lit(0.5)), 2)
         ).withColumn(
             "adjusted_earned_salary_month",
             col("earned_salary_month") - col("penalty_amount_month")
+        ).withColumn(
+            # Penalty percentage of earned salary (percent points). If earned_salary_month is null/zero -> 0.0
+            "penalty_pct_earned_salary_month",
+            when(
+                (col("earned_salary_month").isNotNull()) & (col("earned_salary_month") != 0),
+                round((col("penalty_amount_month") / col("earned_salary_month")) * 100, 2)
+            ).otherwise(lit(0.0))
         )
 
         # Join with driver details and round average columns
@@ -905,10 +923,11 @@ class DriverPerformanceHarmonizer:
             'commission_amount_month', 'on_time_rate_month', 'avg_speed_deviation_month',
             'avg_speed_deviation_pct_month', 'fare_per_km_match_rate_month',
             'fare_per_min_match_rate_month', 'low_ratings_count_month',
-            'penalty_amount_month', 'adjusted_earned_salary_month'
+            'penalty_amount_month', 'penalty_pct_earned_salary_month', 'adjusted_earned_salary_month'
         )
 
         return result
+
 
 class Harmonizer:
     _harmonizer_map = {

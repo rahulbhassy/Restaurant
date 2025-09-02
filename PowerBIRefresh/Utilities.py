@@ -11,7 +11,7 @@ refreshtables = [
     "customerprofile",
     "driverprofile",
     "driverpreference",
-    "driversalary"
+    "driverperformance"
 ]
 
 schema = {
@@ -25,7 +25,7 @@ schema = {
     "customerprofile" : "people",
     "driverpreference": "people",
     "driverprofile": "people",
-    "driversalary" : "people"
+    "driverperformance" : "people"
 }
 
 layer = {
@@ -39,5 +39,5 @@ layer = {
     "customerprofile" : "enrich",
     "driverpreference": "enrich",
     "driverprofile": "enrich",
-    "driversalary": "enrich"
+    "driverperformance": "enrich"
 }

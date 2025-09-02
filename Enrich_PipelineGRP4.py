@@ -70,7 +70,7 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
         initial_load=initial_load
     )
     enrich_salary_table_task(
-        table='driversalary',
+        table='driverperformance',
         loadtype=load_type,
         runtype=runtype,
         initial_load=initial_load
@@ -88,7 +88,7 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
 
     load_balancing_enrichgrp4_task(
         load_type='full',
-        tables=['driverprofile','driverpreference','driversalary'],
+        tables=['driverprofile','driverpreference','driverperformance'],
         runtype=runtype,
         wait_for=downstream_dependencies
     )
@@ -97,7 +97,7 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     logger.info("Starting PowerBI Refresh")
 
     powerbirefresh_flow(
-        configname=['driverprofile','driverpreference','driversalary'],
+        configname=['driverprofile','driverpreference','driverperformance'],
         loadtype=load_type,
         runtype=runtype,
         wait_for=downstream_dependencies

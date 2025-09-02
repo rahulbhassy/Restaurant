@@ -14,7 +14,7 @@ layer = {
     "customerpreference" : "enrich",
     "driverpreference": "enrich",
     "driverprofile": "enrich",
-    "driversalary": "enrich"
+    "driverperformance": "enrich"
 }
 
 SCHEMA = StructType([
@@ -123,7 +123,7 @@ CHECKS = {
     """,
         "targetquery": "SELECT COUNT(driver_id) AS actual_count FROM delta.`{driverpreference}`"
     },
-    "driversalary" : {
+    "driverperformance" : {
         "tables": ["tripdetails","fares"],
         "sourcequery":"""
             WITH fares_trip AS (
@@ -141,7 +141,7 @@ CHECKS = {
             )
         """,
         "targetquery" : """
-            SELECT COUNT(salary_key) AS actual_count FROM delta.`{driversalary}` 
+            SELECT COUNT(salary_key) AS actual_count FROM delta.`{driverperformance}` 
         """
     }
 

@@ -1,5 +1,4 @@
 from EnrichPeople.Config import config,layer , keys, updateitems
-from FileIO import SparkTableViewer
 from Shared.sparkconfig import create_spark_session_large
 from Shared.FileIO import SourceObjectAssignment , DataLakeIO , MergeIO
 from Shared.DataWriter import DataWriter
@@ -53,6 +52,8 @@ datawriter = DataWriter(
     spark=spark,
     format='delta'
 )
+
+
 if initial_load == 'yes':
     datawriter.WriteData(df=destination_data)
 else:
@@ -62,6 +63,5 @@ else:
         currentio= currentio,
         key_columns= keys.get(table)
     )
-    mergeconfig.merge(spark=spark,updated_df=destination_data)
 
 stop_spark(spark=spark)
