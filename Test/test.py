@@ -13,7 +13,7 @@ from pyspark.sql.functions import avg, col, lit , round
 from Balancing.config import SCHEMA
 
 setVEnv()
-table = 'fares'
+table = 'driverdetails'
 spark = create_spark_session()
 loadtype = 'full'
 
@@ -21,7 +21,7 @@ balancingio = DataLakeIO(
     process='read',
     table=table,
     state='current',
-    layer='enrich',
+    layer='raw',
     loadtype=loadtype
 )
 
@@ -32,7 +32,10 @@ reader = DataLoader(
 
 )
 df = reader.LoadData(spark)
+df = df.filter(
+    df.driver_id == '2381'
+)
+df.show()
 
-viewer = SparkTableViewer(df=df)
-viewer.display()
+
 

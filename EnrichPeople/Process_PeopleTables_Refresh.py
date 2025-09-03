@@ -7,7 +7,7 @@ from Shared.pyspark_env import setVEnv , stop_spark
 
 
 setVEnv()
-table = "driverperformance"
+table = "driverprofile"
 loadtype = 'full'
 runtype = 'prod'
 initial_load = 'yes'

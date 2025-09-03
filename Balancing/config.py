@@ -106,7 +106,7 @@ CHECKS = {
                 INNER JOIN delta.`{fares}` f ON f.trip_id = t.trip_id
                 GROUP BY t.driver_id
             )
-            SELECT COUNT(c.driver_id) AS expected_count FROM delta.`{driverdetails}` c INNER JOIN fares_trip ft ON c.driver_id = ft.driver_id
+            SELECT COUNT(ft.driver_id) AS expected_count FROM delta.`{driverdetails}` c INNER JOIN fares_trip ft ON c.driver_id = ft.driver_id
                 """,
         "targetquery": "SELECT COUNT(driver_id) AS actual_count FROM delta.`{driverprofile}`"
     },

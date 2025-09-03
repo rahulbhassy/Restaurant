@@ -4,6 +4,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.functions import count , concat_ws
 from pyspark.sql.window import Window
+import builtins
 from pyspark.sql.functions import col, regexp_replace, round, datediff, to_date, lit , when , year, month , avg , sum , round
 
 class CustomerProfileHarmonizer:
@@ -466,7 +467,7 @@ class DriverProfileHarmonizer:
             if not qlist or qlist[0] is None:
                 return 1.0
             val = float(qlist[0])
-            return max(val, 1.0)
+            return builtins.max(val, 1.0)
 
         q_trips = safe_quantile(final, 'total_trip_count', 0.75)
         q_distance = safe_quantile(final, 'total_distance_km', 0.75)
