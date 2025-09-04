@@ -89,17 +89,6 @@ class DataLoader:
             # Post-load analysis
             load_time = time.time() - start_time
             print(f"\n Successfully loaded data in {load_time:.2f} seconds")
-
-            # Safe row count (avoid OOM for large datasets)
-            try:
-                row_count = df.count()
-                print(f" Row Count:   {row_count:,}")
-            except Exception as e:
-                print(f" Could not count rows: {str(e)[:100]}")
-
-            col_count = len(df.columns)
-            print(f" Column Count: {col_count}")
-            print("=" * 80)
             return df
 
         except Exception as e:
