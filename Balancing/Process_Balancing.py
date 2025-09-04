@@ -10,7 +10,7 @@ setVEnv()
 spark = create_spark_session()
 runtype = 'prod'
 loadtype = 'full'
-tables = ['driverprofile']
+tables = ['all']
 tables = CHECKS.keys() if tables[0] == 'all' else tables
 final = spark.createDataFrame([], SCHEMA)
 results = []

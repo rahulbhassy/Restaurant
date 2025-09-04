@@ -248,12 +248,12 @@ class MergeIO:
         print(f"Merge operation completed successfully for table: {self.table}")
 
 class DeltaLakeOps:
-    def __init__(self,path: str,spark: SparkSession):
+    def __init__(self,path: str,table: str):
         self.path = path
-        self.spark = spark
+        self.table = table
 
-    def getHistory(self,count: bool = False):
-        historyDF = self.spark.sql(f"DESCRIBE HISTORY delta.`{self.path}`")
+    def getHistory(self,spark: SparkSession,count: bool = False):
+        historyDF = spark.sql(f"DESCRIBE HISTORY delta.`{self.path}`")
         historyDF.show()
         if count:
             # 2. Collect just the version numbers
@@ -262,7 +262,7 @@ class DeltaLakeOps:
             # 3. For each version, issue a COUNT(*) query
             results = []
             for v in versions:
-                cnt = self.spark.sql(f"""
+                cnt = spark.sql(f"""
                     SELECT {v} AS version,
                            COUNT(*) AS record_count
                       FROM delta.`{self.path}` VERSION AS OF {v}
@@ -273,17 +273,39 @@ class DeltaLakeOps:
             for version, count in results:
                 print(f"Version {version:>2} → {count} rows")
 
-    def restore(self, version: int):
+    def restore(self,spark: SparkSession, version: int):
         """
         Restores the Delta table to a specific version.
 
         :param version: The version number to restore to.
         """
-        self.spark.sql(f"""
+        spark.sql(f"""
             RESTORE delta.`{self.path}`
             TO VERSION AS OF {version};
         """)
         print(f"Restored Delta table at {self.path} to version {version}.")
+
+    def vacuum(self,spark: SparkSession,retention: int):
+        spark.sql(f"""
+            VACUUM delta.`{self.path}`
+            RETAIN {retention} HOURS
+        """)
+        print(f"Vacuumed {self.table}")
+
+    def optimise(self,spark: SparkSession):
+        spark.sql(f"""
+            OPTIMIZE delta.`{self.path}`
+        """)
+        print(f"Optimized {self.table}")
+
+    def altertable(self,spark: SparkSession):
+        spark.sql(f"""
+            ALTER TABLE delta.`{self.path}` SET TBLPROPERTIES (
+                'delta.deletedFileRetentionDuration' = '72 hours',
+                'delta.logRetentionDuration' = '72 hours'
+            );
+        """)
+        print(f"Table {self.table} altered.")
 
 
 import math
@@ -402,11 +424,11 @@ class SourceObjectAssignment:
         io_map = {}
         for table in self.sourcetables:
             io_map[table] = DataLakeIO(
-                process=process,
+                process="enrichweather" if layer.get(table) == 'enrichweather' else process,
                 table=table,
                 loadtype=self.loadtype,
                 state='current',
-                layer=layer.get(table),
+                layer='enrich' if layer.get(table) == 'enrichweather' else layer.get(table),
                 runtype=self.runtype
             )
         return io_map
