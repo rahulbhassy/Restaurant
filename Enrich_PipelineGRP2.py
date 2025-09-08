@@ -4,6 +4,7 @@ from prefect import get_run_logger
 from EnrichFare.NoteBooks import Process_FareTablesRefresh
 from Balancing.NoteBooks import Process_Balancing
 from PowerBIRefresh_Pipeline import powerbirefresh_flow
+from Optimize_Pipeline import optimize_flow
 
 @task(name="Enrich_Fare_Table", tags=["enrich", "fare"])
 def enrich_fare_tables_task(table: str, loadtype: str, runtype: str = 'prod'):
@@ -83,6 +84,17 @@ def enrich_grp2_processing_flow(load_type: str, runtype: str = 'prod'):
         enrich_weatherimpact_table_task,
         enrich_timeseries_table_task
     ]
+    tables = ['fares','weatherimpact','timeseries']
+    for table in tables:
+        optimize_flow(
+            tabletype='enrich',
+            load_type='full',
+            runtype=runtype,
+            table=table,
+            altertable=False,
+            wait_for=downstream_dependencies
+        )
+    downstream_dependencies.append(optimize_flow)
 
     load_balancing_enrichgrp2_task(
         load_type=load_type,
@@ -93,7 +105,7 @@ def enrich_grp2_processing_flow(load_type: str, runtype: str = 'prod'):
 
     logger.info("Starting PowerBI Refresh")
     powerbirefresh_flow(
-        configname=['fares','weatherimpact','timeseries'],
+        configname=tables,
         loadtype='full',
         runtype=runtype,
         wait_for=downstream_dependencies

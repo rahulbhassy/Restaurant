@@ -8,6 +8,7 @@ from SourceWeather.NoteBooks import Process_Weather
 from Balancing.NoteBooks import Process_Balancing
 from EnrichUber.NoteBooks import Process_Weather_Uber,Process_Distance_Uber
 from PowerBIRefresh_Pipeline import powerbirefresh_flow
+from Optimize_Pipeline import optimize_flow
 from prefect import get_run_logger
 # Optional for parallel runs
 
@@ -163,6 +164,24 @@ def raw_processing_flow(load_type: str,runtype: str = 'prod'):
         runtype=runtype,
         wait_for=downstream_dependencies
     )
+    downstream_dependencies.append(enrich_distance_uber_task)
+
+    tables = {
+        None : "raw",
+        "uberfares" : "enrich",
+        "uberfaresweather" : "system"
+    }
+    for table , layer in tables.items():
+        optimize_flow(
+            tabletype=layer,
+            load_type='full',
+            runtype=runtype,
+            altertable=False,
+            table='uberfares' if table == 'uberfaresweather' else table,
+            wait_for=downstream_dependencies
+        )
+    downstream_dependencies.append(optimize_flow)
+
     powerbirefresh_flow(
         configname=['customerdetails','driverdetails','vehicledetails'],
         loadtype='full',

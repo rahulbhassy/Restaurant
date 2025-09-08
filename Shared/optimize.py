@@ -1,3 +1,5 @@
+from typing import Optional
+
 from Shared.FileIO import DeltaLakeOps , SourceObjectAssignment
 from Shared.config import RAWLAYER,RAWTABLES,SYSTEMLAYER,SYSTEMTABLES,ENRICHTABLES,ENRICHLAYER,SPATIALLAYER,SPATIALTABLES
 from Shared.pyspark_env import setVEnv,stop_spark
@@ -7,7 +9,7 @@ import argparse
 import sys
 import datetime
 
-def main(tabletype, loadtype,runtype='prod',altertable=False):
+def main(tabletype, loadtype,table: Optional[str]= None,runtype='prod',altertable=False):
     logging = Logger(notebook_name='Process_Optimize')
     logger = logging.setup_logger()
 
@@ -29,6 +31,8 @@ def main(tabletype, loadtype,runtype='prod',altertable=False):
             tabletype,
             (ENRICHTABLES, ENRICHLAYER, 'large')
         )
+        if table:
+            tables = [table]
 
         # Create appropriate Spark session
         spark = create_spark_session_sedona() if session_type == 'sedona' else create_spark_session_large()

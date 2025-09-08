@@ -5,6 +5,7 @@ from prefect import get_run_logger
 from EnrichPeople.NoteBooks import Process_PeopleTables_Refresh
 from PowerBIRefresh_Pipeline import powerbirefresh_flow
 from Balancing.NoteBooks import Process_Balancing
+from Optimize_Pipeline import optimize_flow
 
 @task(name="Enrich_DriverProfile_Table", tags=["enrich", "people", "driverprofile"])
 def enrich_profile_table_task(table: str, loadtype: str, runtype: str = 'prod',initial_load: str = 'no'):
@@ -85,7 +86,16 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     )
     downstream_dependencies.append(enrich_salary_table_task)
     downstream_dependencies.append(enrich_preference_table_task)
-
+    for table in tables:
+        optimize_flow(
+            tabletype='enrich',
+            load_type=load_type,
+            runtype=runtype,
+            table=table,
+            altertable=False,
+            wait_for=downstream_dependencies
+        )
+    downstream_dependencies.append(optimize_flow)
     load_balancing_enrichgrp4_task(
         load_type='full',
         tables=['driverprofile','driverpreference','driverperformance'],
