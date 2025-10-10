@@ -1,5 +1,5 @@
 from Shared.pyspark_env import setVEnv
-from Shared.sparkconfig import create_spark_session
+from Shared.sparkconfig import create_spark_session_large
 from Schema import sourceschema
 from Shared.DataLoader import DataLoader
 from Shared.DataWriter import DataWriter
@@ -9,12 +9,12 @@ from DataCleaner import DataCleaner
 
 
 setVEnv()
-spark = create_spark_session()
+spark = create_spark_session_large()
 '''
 Fact Tables - uberfares , tripdetails
 '''
 sourceobject = "tripdetails"
-loadtype = "full"
+loadtype = "delta"
 sourceschema = sourceschema(sourcedefinition=sourceobject)
 
 loadio = DataLakeIO(

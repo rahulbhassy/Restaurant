@@ -59,7 +59,7 @@ def load_balancing_enrichgrp4_task(load_type: str,tables: List[str],runtype: str
     description="ETL pipeline for Uber data processing",
     version="1.0"
 )
-def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_load: str = 'no'):
+def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_load: str = 'no',optimize:bool = False):
     """Orchestrates Uber data processing workflow"""
     logger = get_run_logger()
     logger.info(f"Starting pipeline with load_type: {load_type}")
@@ -86,19 +86,24 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     )
     downstream_dependencies.append(enrich_salary_table_task)
     downstream_dependencies.append(enrich_preference_table_task)
-    for table in tables:
-        optimize_flow(
-            tabletype='enrich',
-            load_type=load_type,
-            runtype=runtype,
-            table=table,
-            altertable=False,
-            wait_for=downstream_dependencies
-        )
-    downstream_dependencies.append(optimize_flow)
+
+    tables = ['driverprofile', 'driverpreference', 'driverperformance']
+
+    if optimize:
+        for table in tables:
+            optimize_flow(
+                tabletype='enrich',
+                load_type=load_type,
+                runtype=runtype,
+                table=table,
+                altertable=False,
+                wait_for=downstream_dependencies
+            )
+        downstream_dependencies.append(optimize_flow)
+
     load_balancing_enrichgrp4_task(
         load_type='full',
-        tables=['driverprofile','driverpreference','driverperformance'],
+        tables=tables,
         runtype=runtype,
         wait_for=downstream_dependencies
     )
@@ -107,7 +112,7 @@ def enrich_grp4_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     logger.info("Starting PowerBI Refresh")
 
     powerbirefresh_flow(
-        configname=['driverprofile','driverpreference','driverperformance'],
+        configname=tables,
         loadtype=load_type,
         runtype=runtype,
         wait_for=downstream_dependencies
@@ -118,5 +123,6 @@ if __name__ == "__main__":
     enrich_grp4_processing_flow(
         load_type="full",
         runtype="prod",
-        initial_load='yes'
+        initial_load='yes',
+        optimize=False
     )

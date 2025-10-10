@@ -46,7 +46,7 @@ def load_balancing_enrichgrp3_task(load_type: str,tables: List[str],runtype: str
     description="ETL pipeline for Uber data processing",
     version="1.0"
 )
-def enrich_grp3_processing_flow(load_type: str, runtype: str = 'prod',initial_load: str = 'no'):
+def enrich_grp3_processing_flow(load_type: str, runtype: str = 'prod',initial_load: str = 'no',optimize: bool = False):
     """Orchestrates Uber data processing workflow"""
     logger = get_run_logger()
     logger.info(f"Starting pipeline with load_type: {load_type}")
@@ -69,16 +69,19 @@ def enrich_grp3_processing_flow(load_type: str, runtype: str = 'prod',initial_lo
     )
     downstream_dependencies.append(enrich_preference_tables_task)
     tables = ['customerprofile','customerpreference']
-    for table in tables:
-        optimize_flow(
-            tabletype='enrich',
-            load_type=load_type,
-            runtype=runtype,
-            table=table,
-            altertable=False,
-            wait_for=downstream_dependencies
-        )
+
+    if optimize:
+        for table in tables:
+            optimize_flow(
+                tabletype='enrich',
+                load_type=load_type,
+                runtype=runtype,
+                table=table,
+                altertable=True,
+                wait_for=downstream_dependencies
+            )
     downstream_dependencies.append(optimize_flow)
+
     load_balancing_enrichgrp3_task(
         load_type='full',
         tables=tables,
@@ -101,5 +104,6 @@ if __name__ == "__main__":
     enrich_grp3_processing_flow(
         load_type="full",
         runtype="prod",
-        initial_load='yes'
+        initial_load='yes',
+        optimize=False
     )

@@ -50,7 +50,7 @@ def main(tabletype, loadtype,table: Optional[str]= None,runtype='prod',altertabl
             )
             if altertable:
                 deltalakeops.altertable(spark=spark)
-            deltalakeops.vacuum(spark=spark,retention=48)
+            deltalakeops.vacuum(spark=spark,retention=120)
             deltalakeops.optimise(spark=spark)
 
         logger.info(f"Processing completed at {datetime.datetime.now()}")

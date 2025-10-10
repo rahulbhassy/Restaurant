@@ -1,4 +1,4 @@
-from asyncio import wait_for
+
 
 from prefect import flow, task
 from prefect_dask.task_runners import DaskTaskRunner
@@ -36,7 +36,7 @@ def load_balancing_enrichgrp1_task(load_type: str,runtype: str = 'prod'):
     description="ETL pipeline for Uber data processing",
     version="1.0"
 )
-def enrich_grp1_processing_flow(load_type: str,runtype: str = 'prod'):
+def enrich_grp1_processing_flow(load_type: str,runtype: str = 'prod',optimize: bool = False):
     """Orchestrates Uber data processing workflow"""
     logger = get_run_logger()
     logger.info(f"Starting pipeline with load_type: {load_type}")
@@ -50,15 +50,17 @@ def enrich_grp1_processing_flow(load_type: str,runtype: str = 'prod'):
         runtype=runtype,
     )
     downstream_dependencies = [enrich_geospatial_uber_task]
-    optimize_flow(
-        tabletype='spatial',
-        load_type='full',
-        runtype=runtype,
-        table='uber',
-        altertable=False,
-        wait_for=downstream_dependencies
-    )
-    downstream_dependencies.append(optimize_flow)
+
+    if optimize:
+        optimize_flow(
+            tabletype='spatial',
+            load_type='full',
+            runtype=runtype,
+            table='uber',
+            altertable=False,
+            wait_for=downstream_dependencies
+        )
+        downstream_dependencies.append(optimize_flow)
     load_balancing_enrichgrp1_task(
         load_type='full',
         runtype=runtype,
@@ -69,5 +71,6 @@ if __name__ == "__main__":
     # Example execution
     enrich_grp1_processing_flow(
         load_type="delta",
-        runtype="prod"
+        runtype="prod",
+        optimize=False
     )

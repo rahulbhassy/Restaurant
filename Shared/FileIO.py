@@ -301,8 +301,8 @@ class DeltaLakeOps:
     def altertable(self,spark: SparkSession):
         spark.sql(f"""
             ALTER TABLE delta.`{self.path}` SET TBLPROPERTIES (
-                'delta.deletedFileRetentionDuration' = '72 hours',
-                'delta.logRetentionDuration' = '72 hours'
+                'delta.deletedFileRetentionDuration' = '120 hours',
+                'delta.logRetentionDuration' = '120 hours'
             );
         """)
         print(f"Table {self.table} altered.")

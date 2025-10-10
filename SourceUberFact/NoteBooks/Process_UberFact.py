@@ -1,5 +1,5 @@
 from Shared.pyspark_env import setVEnv,stop_spark
-from Shared.sparkconfig import create_spark_session
+from Shared.sparkconfig import create_spark_session_large
 from Shared.DataLoader import DataLoader
 from Shared.DataWriter import DataWriter
 from Shared.FileIO import DataLakeIO
@@ -20,7 +20,7 @@ def main(sourceobject, loadtype,runtype='prod'):
 
     try:
         setVEnv()
-        spark = create_spark_session()
+        spark = create_spark_session_large()
         '''
         Fact Tables - uberfares , tripdetails
         '''
