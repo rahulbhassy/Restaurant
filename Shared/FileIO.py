@@ -300,7 +300,7 @@ class DeltaLakeOps:
         self.table = table
     def get_last_loaded_timestamp(self,spark: SparkSession):
         max_time_df = spark.sql(f"""
-            SELECT MAX(ingested_date) AS max_ingested_date
+            SELECT MAX(ingested_at) AS max_ingested_date
             FROM delta.`{self.path}`
         """)
         max_time = max_time_df.collect()[0]['max_ingested_date']

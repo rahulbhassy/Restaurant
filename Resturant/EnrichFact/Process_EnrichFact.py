@@ -8,7 +8,7 @@ from Shared.pyspark_env import stop_spark
 
 
 setVEnv()
-table = 'fact_stock_enriched'
+table = 'fact_kitchen_enriched'
 loadtype = 'full'
 runtype = 'prod'
 spark = create_spark_session_large()

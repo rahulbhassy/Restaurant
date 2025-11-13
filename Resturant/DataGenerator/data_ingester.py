@@ -2,7 +2,7 @@ from Shared.pyspark_env import setVEnv
 from Shared.sparkconfig import create_spark_session_jdbc
 from Shared.DataWriter import DataWriter
 from Shared.DataLoader import DataLoader
-from schema import schema_dict
+from schema import schema_dict, writer_mode
 
 from pyspark.sql.functions import to_json , col
 setVEnv()
@@ -35,5 +35,6 @@ for table in table_load_order:
         spark=spark,
         format='jdbc',
         table=table,
+        mode=writer_mode.get(table)
     )
     jdbcwriter.WriteData(df=df)

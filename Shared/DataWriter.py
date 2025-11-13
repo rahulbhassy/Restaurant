@@ -21,20 +21,22 @@ class DataWriter:
             loadtype: str,
             spark: SparkSession,
             format: str = "delta",
+            mode: str = None,
             path: Optional[str] = None,
             table: Optional[str] = None,
             schema: Optional[str] = None
     ):
         self.loadtype = loadtype
-        self.mode = 'overwrite'
+        self.mode = mode
         self.path = path
         self.format = format.lower()
         self.spark = spark
         self.table = table
         self.schema = schema
 
-        if self.loadtype == "delta":
-            self.mode = "append"
+        if self.mode == None:
+            self.mode = "overwrite" if self.loadtype == "full" else "append"
+
 
         print(f"DataWriter initialized: loadtype={loadtype}, mode={self.mode}, path={path}, format={self.format}")
 

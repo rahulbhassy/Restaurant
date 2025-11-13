@@ -12,11 +12,11 @@ class TableLoader:
         return f"SELECT * FROM {self.table_name}"
 
     def delta_query(self) -> str:
-        if self.delta_column:
-            if self.end_delta and self.start_delta:
+        if self.delta_column is not None:
+            if self.end_delta is not None and self.start_delta is not None:
                 return (f"{self.base_query()} WHERE {self.delta_column} > '{self.start_delta}' "
                         f"AND {self.delta_column} <= '{self.end_delta}'")
-            elif self.end_delta:
+            elif self.end_delta is not None:
                 return f"{self.base_query()} WHERE {self.delta_column} <= '{self.end_delta}'"
             elif self.end_delta is None and self.start_delta is None:
                 return self.base_query()

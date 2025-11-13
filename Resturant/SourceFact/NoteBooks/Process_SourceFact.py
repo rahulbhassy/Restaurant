@@ -2,16 +2,16 @@ from Shared.pyspark_env import setVEnv
 from Shared.sparkconfig import create_spark_session_jdbc
 from Shared.FileIO import DataLakeIO
 from Shared.DataWriter import DataWriter
-from Shared.FileIO import DeltaLakeOps
+from Shared.FileIO import DeltaLakeOps , MergeIO
 from Resturant.SourceFact.utilities import TableLoader
 from Resturant.SourceFact.DataCleaner import DataCleaner
-from Resturant.SourceFact.config import table_config , delta_column_dict
+from Resturant.SourceFact.config import table_config , delta_column_dict , merge_keys
 from pyspark.sql.functions import current_timestamp
 from Shared.pyspark_env import stop_spark
 from Shared.Logger import Logger
 import argparse
 import sys
-import datetime
+from datetime import datetime
 
 def main(table, loadtype,runtype='prod'):
     logging = Logger(notebook_name='Process_SourceFact')
@@ -41,9 +41,13 @@ def main(table, loadtype,runtype='prod'):
             table=table,
             path=currentio.filepath()
         )
-        if loadtype == 'delta':
-            end_delta = ingestion_time
+        delta_tables = ['fact_sales', 'fact_kitchen']
+        if loadtype == 'delta' and table in delta_tables:
+            end_delta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             start_delta = dataops.get_last_loaded_timestamp(spark)
+        else:
+            loadtype = 'full'
+
 
         loader = TableLoader(
             table_name=table,
@@ -64,16 +68,23 @@ def main(table, loadtype,runtype='prod'):
 
         df = cleaner.clean(df)
 
-        writer = DataWriter(
-            loadtype=loadtype,
-            spark=spark,
-            format='delta',
-            path=currentio.filepath(),
-        )
-
-        writer.WriteData(df)
+        if loadtype == 'full':
+            writer = DataWriter(
+                loadtype=loadtype,
+                spark=spark,
+                format='delta',
+                path=currentio.filepath(),
+            )
+            writer.WriteData(df)
+        else:
+            mergeio = MergeIO(
+                table=table,
+                currentio=currentio,
+                key_columns=merge_keys.get(table)
+            )
+            mergeio.merge(spark=spark, updated_df=df)
         stop_spark(spark=spark)
-        logger.info(f"Processing completed at {datetime.datetime.now()}")
+        logger.info(f"Processing completed at {datetime.now()}")
         return 0
 
     except Exception as e:

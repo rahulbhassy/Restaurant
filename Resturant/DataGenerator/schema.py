@@ -90,3 +90,14 @@ schema_dict = {
     "fact_kitchen": fact_kitchen_schema,
     "fact_stock": fact_stock_schema
 }
+
+writer_mode = {
+    "dim_outlet": "overwrite",
+    "dim_customer": "overwrite",
+    "dim_item": "overwrite",
+    "dim_stock_item": "overwrite",
+    "dim_chef": "overwrite",
+    "fact_sales": "append",
+    "fact_kitchen": "append",
+    "fact_stock": "append"
+}

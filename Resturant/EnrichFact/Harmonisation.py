@@ -261,19 +261,16 @@ class FactSalesEnricher:
         dim_outlet = dataframes['dim_outlet']
         df_kitchen = dataframes.get('fact_kitchen', None)  # optional
 
-        # 1) ensure time dims on sales
+
         df_sales = self._time_dims(df_sales, ts_col="order_ts")
 
-        # 2) aggregate item metrics to order-level
         items_agg = self._aggregate_items(df_items)
 
-        # 3) optional kitchen flags
+
         kitchen_agg = self._kitchen_flags(df_kitchen) if df_kitchen is not None else None
 
-        # 4) customer lifetime metrics (per customer)
         cust_agg = self._customer_metrics(df_sales)
 
-        # 5) Build enriched order-level DF by left-joining aggregates and dims
         enriched = (
             df_sales
             .join(items_agg, on="order_id", how="left")
@@ -285,11 +282,9 @@ class FactSalesEnricher:
         if kitchen_agg is not None:
             enriched = enriched.join(kitchen_agg, on="order_id", how="left")
         else:
-            # add placeholder columns to keep schema stable
             enriched = enriched.withColumn("cook_duration_seconds", coalesce(col("cook_duration_seconds"), lit(None))) \
                                .withColumn("was_delayed_order", coalesce(col("was_delayed_order"), lit(False)))
 
-        # 6) Derived fields, flags & bands
         enriched = (
             enriched
             .withColumn("total_items", coalesce(col("total_items"), lit(0)))
@@ -304,21 +299,18 @@ class FactSalesEnricher:
                                          .otherwise(lit("High")))
         )
 
-        # 7) customer recency & repeat / first order flags:
-        # total_orders_by_customer and customer_lifetime_value are from cust_agg
         enriched = (
             enriched
             .withColumn("is_repeat_customer", when(col("total_orders_by_customer") > 1, lit(True)).otherwise(lit(False)))
         )
 
-        # days_since_last_order: difference between this order_ts and last_order_ts
         enriched = enriched.withColumn("days_since_last_order",
                                        when(col("last_order_ts").isNotNull(),
                                             (to_date(col("order_ts")).cast("long") - to_date(col("last_order_ts")).cast("long"))
                                            ).otherwise(lit(None))
                                       )
 
-        # 8) Final selection / order of columns (recommended)
+
         final_cols = [
             "order_id", "order_ts", "order_date", "order_hour", "order_week", "order_month", "order_year", "day_of_week", "is_weekend", "is_peak_hour",
             "customer_id", "customer_mobile", "is_repeat_customer", "total_orders_by_customer", "customer_lifetime_value", "days_since_last_order",
@@ -328,8 +320,6 @@ class FactSalesEnricher:
             "payment_mode", "is_digital_payment", "order_type", "order_value_band", "is_multi_item_order", "is_high_value_order",
             "cook_duration_seconds", "was_delayed_order"
         ]
-
-        # keep only existing columns (safe)
         final_cols = [c for c in final_cols if c in enriched.columns]
 
         fact_sales_enriched = enriched.select(*final_cols)
@@ -339,12 +329,6 @@ class FactSalesEnricher:
 class FactKitchenEnricher:
 
     def __init__(self, runtype: str, loadtype: str):
-        """
-        Minimal enrichment for fact_kitchen:
-        - cooking time
-        - SLA delay flag
-        - join dims
-        """
         self.runtype = runtype
         self.loadtype = loadtype
         self.sla_seconds = 600
@@ -379,31 +363,18 @@ class FactKitchenEnricher:
             .withColumn("cooking_end", to_timestamp(col("cooking_end")))
         )
 
-        # -----------------------------------------
-        # 2. Compute cooking duration in seconds
-        # -----------------------------------------
         df = df.withColumn(
             "cook_duration_seconds",
             col("cooking_end").cast("long") - col("cooking_start").cast("long")
         )
-
-        # -----------------------------------------
-        # 3. SLA flag (delayed if duration > threshold)
-        # -----------------------------------------
         df = df.withColumn(
             "was_delayed_order",
             when(col("cook_duration_seconds") > self.sla_seconds, lit(True))
             .otherwise(lit(False))
         )
 
-        # -----------------------------------------
-        # 4. Add Time Dimensions
-        # -----------------------------------------
         df = self._time_dims(df, "cooking_start")
 
-        # -----------------------------------------
-        # 5. Join Chefs + Outlets
-        # -----------------------------------------
         df = (
             df
             .join(dim_chef.select("chef_id", "chef_name"), on="chef_id", how="left")
@@ -441,7 +412,6 @@ class FactStockEnricher:
         self.high_threshold = 100.0
 
     def _time_dims(self, df: DataFrame, ts_col: str):
-        """Minimal Spark-3 compatible time dims"""
         df = df.withColumn(ts_col, to_timestamp(col(ts_col)))
         return (
             df
@@ -464,19 +434,17 @@ class FactStockEnricher:
           dim_stock_item -> dim_stock_item (stock_id / stock_item / unit_of_measure)
           dim_outlet     -> dim_outlet (outlet_id / outlet_name)
 
-        Returns:
-          Minimal enriched fact_stock DataFrame
+
         """
         df_stock = dataframes['fact_stock']
         dim_stock_item = dataframes['dim_stock_item']
         dim_outlet = dataframes['dim_outlet']
 
-        # 1) normalize timestamp and numeric quantity
+
         df = df_stock.withColumn("stock_date_raw", col("stock_date")) \
                      .withColumn("stock_date", to_timestamp(col("stock_date"))) \
                      .withColumn("available_quantity", coalesce(col("available_quantity").cast("double"), lit(0.0)))
 
-        # 2) add simple inventory status & restock flag
         df = df.withColumn(
             "inventory_status",
             when(col("available_quantity") <= self.low_threshold, lit("low"))
@@ -487,10 +455,8 @@ class FactStockEnricher:
             when(col("available_quantity") <= self.low_threshold, lit(True)).otherwise(lit(False))
         )
 
-        # 3) add time dimensions (Spark 3 safe)
         df = self._time_dims(df, "stock_date")
 
-        # 4) join with dims for friendly names
         df = (
             df
             .join(dim_stock_item.select(col("stock_item").alias("dim_stock_item"), "unit_of_measure").withColumnRenamed("unit_of_measure","dim_unit_of_measure"),
@@ -502,7 +468,6 @@ class FactStockEnricher:
             .join(dim_outlet.select("outlet_id", "outlet_name"), on="outlet_id", how="left")
         )
 
-        # 5) final minimal column selection
         final_cols = [
             "outlet_id", "outlet_name",
             "stock_item", "unit_of_measure",
@@ -512,7 +477,6 @@ class FactStockEnricher:
             "stock_week", "stock_month", "stock_year", "day_of_week_num"
         ]
 
-        # keep only existing columns (safe)
         final_cols = [c for c in final_cols if c in df.columns]
         df = df.select(*final_cols)
         df = df.withColumn("ingested_at", current_timestamp())

@@ -87,5 +87,10 @@ delta_column_dict = {
     # FACT tables
     "fact_sales": "order_ts",
     "fact_kitchen": "cooking_end",    # better for incremental
-    "fact_stock": "stock_date"
+    "fact_stock": None
+}
+
+merge_keys = {
+    "fact_sales": ["order_id"],
+    "fact_kitchen": ["order_id"],
 }

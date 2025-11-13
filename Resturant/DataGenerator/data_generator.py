@@ -10,7 +10,7 @@ import os
 OUTPUT_DIR = "kfc_complete_data"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-start_date_str = "2025-11-01"
+start_date_str = "2025-11-10"
 num_days = 3
 orders_per_outlet_per_day = 300
 outlets = [

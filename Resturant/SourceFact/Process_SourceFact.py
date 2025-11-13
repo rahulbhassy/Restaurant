@@ -5,9 +5,11 @@ from Shared.DataWriter import DataWriter
 from Shared.FileIO import DeltaLakeOps
 from Resturant.SourceFact.utilities import TableLoader
 from Resturant.SourceFact.DataCleaner import DataCleaner
-from Resturant.SourceFact.config import table_config , delta_column_dict
+from Resturant.SourceFact.config import table_config , delta_column_dict , merge_keys
 from pyspark.sql.functions import current_timestamp
 from Shared.pyspark_env import stop_spark
+from Shared.FileIO import MergeIO
+from datetime import datetime
 
 setVEnv()
 spark = create_spark_session_jdbc()
@@ -29,9 +31,12 @@ dataops = DeltaLakeOps(
     table=table,
     path=currentio.filepath()
 )
-if loadtype == 'delta':
-    end_delta = ingestion_time
+delta_tables = ['fact_sales', 'fact_kitchen']
+if loadtype == 'delta' and table in delta_tables:
+    end_delta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start_delta = dataops.get_last_loaded_timestamp(spark)
+else:
+    loadtype = 'full'
 
 
 loader = TableLoader(
@@ -53,13 +58,21 @@ cleaner = DataCleaner(
 
 df = cleaner.clean(df)
 
-writer = DataWriter(
-    loadtype=loadtype,
-    spark=spark,
-    format='delta',
-    path=currentio.filepath(),
-)
+if loadtype == 'full':
+    writer = DataWriter(
+        loadtype=loadtype,
+        spark=spark,
+        format='delta',
+        path=currentio.filepath(),
+    )
+    writer.WriteData(df)
+else:
+    mergeio = MergeIO(
+        table=table,
+        currentio=currentio,
+        key_columns=merge_keys.get(table)
+    )
+    mergeio.merge(spark=spark, updated_df=df)
 
-writer.WriteData(df)
 
 stop_spark(spark)
