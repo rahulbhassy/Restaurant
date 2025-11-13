@@ -9,6 +9,8 @@ from shapely.geometry import Point, Polygon, LineString
 from pyspark.sql import SparkSession
 from Shared.DataLoader import DataLoader
 from delta.tables import DeltaTable
+from pyspark.sql import Window
+from pyspark.sql.functions import *
 
 # -- CONFIG --
 import os
@@ -18,10 +20,52 @@ from typing import List, Optional
 DATALAKE_PREFIX = r"C:\Users\HP\uber_project\Data"
 
 
+from typing import List, Optional, Tuple
+from pyspark.sql.window import Window
+
+
+class WindowHelper:
+
+    @staticmethod
+    def create_window_spec(
+        order_by_cols: Optional[List[str]] = None,
+        partition_by_cols: Optional[List[str]] = None,
+        frame: Optional[Tuple[int, int]] = None
+    ):
+        """
+        Creates a reusable Window Specification.
+
+        Parameters
+        ----------
+        order_by_cols : List[str]
+            Columns to order by.
+        partition_by_cols : List[str]
+            Columns to partition by.
+        frame : Tuple[int, int]
+            Window frame as (start, end).
+            Example: (-2, 0) for 3-row moving window,
+                     (Window.unboundedPreceding, 0) for cumulative.
+        """
+
+        w = Window()
+
+        if partition_by_cols:
+            w = w.partitionBy(*partition_by_cols)
+
+        if order_by_cols:
+            w = w.orderBy(*order_by_cols)
+
+        if frame:
+            w = w.rowsBetween(frame[0], frame[1])
+
+        return w
+
 class DataLakeIO:
     _RAW_TABLES = frozenset({
         "uberfares", "tripdetails", "driverdetails",
-        "customerdetails", "vehicledetails", "features" , "weatherdetails"
+        "customerdetails", "vehicledetails", "features" , "weatherdetails",
+        "dim_outlet", "dim_customer", "dim_item", "dim_stock_item", "dim_chef",
+        "fact_sales", "fact_kitchen","fact_stock","fact_sales_items"
     })
     _INPUT_SUFFIX = ".geojson"
 
@@ -122,7 +166,10 @@ class IntermediateIO:
     _TABLES = frozenset([
         "uberfares", "tripdetails", "driverdetails", "weatherimpact", "balancingresults" , "BalancingResults",
         "customerdetails", "vehicledetails", "uber","features", "weatherdetails" , "fares" , "timeseries",
-        "customerprofile","driverprofile","customerpreference","driverpreference","driverperformance"
+        "customerprofile","driverprofile","customerpreference","driverpreference","driverperformance",
+        "dim_outlet", "dim_customer", "dim_item", "dim_stock_item", "dim_chef", "fact_sales", "fact_kitchen",
+        "fact_stock","fact_sales_enriched" , "fact_kitchen_enriched","fact_stock_enriched","fact_sales_items",
+        "customer_preference","customer","chef_performance","outlet_performance"
     ])
 
     def __init__(self, fullpath: str, date: str = None):
@@ -251,6 +298,13 @@ class DeltaLakeOps:
     def __init__(self,path: str,table: str):
         self.path = path
         self.table = table
+    def get_last_loaded_timestamp(self,spark: SparkSession):
+        max_time_df = spark.sql(f"""
+            SELECT MAX(ingested_date) AS max_ingested_date
+            FROM delta.`{self.path}`
+        """)
+        max_time = max_time_df.collect()[0]['max_ingested_date']
+        return max_time
 
     def getHistory(self,spark: SparkSession,count: bool = False):
         historyDF = spark.sql(f"DESCRIBE HISTORY delta.`{self.path}`")

@@ -16,11 +16,12 @@ class DataLoader:
       - 'geojson'
     """
 
-    def __init__(self, path: str, filetype: str, loadtype: str = None, schema: StructType = None):
+    def __init__(self, filetype: str,path: str = None,query: str = None, loadtype: str = None, schema: StructType = None):
         self.path = path
         self.schema = schema
         self.filetype = filetype.lower()
         self.loadtype = loadtype
+        self.query = query
 
         print("\n" + "=" * 80)
         print("DATA LOADER INITIALIZED")
@@ -58,19 +59,41 @@ class DataLoader:
 
             # JDBC
             elif self.filetype == 'jdbc':
-                print(" Using JDBC loader")
+                print("🗄️  Using JDBC loader")
                 print(f"   URL: {JDBC_URL}")
                 print(f"   User: {JDBC_PROPERTIES['user']}")
-                print(f"   Table: {self.path}")
 
+                # ----------------------------------------------------------
+                # Support two modes:
+                #   1️⃣ Table name only (self.path = "fact_sales")
+                #   2️⃣ Query (self.query = "SELECT * FROM fact_sales WHERE order_date = '2025-11-12'")
+                # ----------------------------------------------------------
+
+                # Default: use dbtable (full table read)
+                jdbc_options = {
+                    "url": JDBC_URL,
+                    "user": JDBC_PROPERTIES['user'],
+                    "password": JDBC_PROPERTIES['password'],
+                    "driver": JDBC_PROPERTIES['driver']
+                }
+
+                if hasattr(self, "query") and self.query:
+                    # Use a query instead of full table
+                    print(f"   Executing SQL Query:\n   {self.query}")
+                    # Wrap the query in parentheses and alias as a subquery
+                    jdbc_options["dbtable"] = f"({self.query}) AS tmp"
+                elif self.path:
+                    print(f"   Table: {self.path}")
+                    jdbc_options["dbtable"] = self.path
+                else:
+                    raise ValueError(
+                        "❌ Either 'self.path' (table name) or 'self.query' must be provided for JDBC loader.")
+
+                # Load DataFrame
                 df = (
                     spark.read
-                    .format('jdbc')
-                    .option('url', JDBC_URL)
-                    .option('dbtable', self.path)
-                    .option('user', JDBC_PROPERTIES['user'])
-                    .option('password', '******')  # Mask password
-                    .option('driver', JDBC_PROPERTIES['driver'])
+                    .format("jdbc")
+                    .options(**jdbc_options)
                     .load()
                 )
 
@@ -82,7 +105,13 @@ class DataLoader:
                     print("🔧 Applying custom schema")
                     reader = reader.schema(self.schema)
                 df = reader.json(self.path)
-
+            elif self.filetype == 'json':
+                print(" Using JSON loader with multiline=True")
+                reader = spark.read.option("multiline", "true")
+                if self.schema:
+                    print("🔧 Applying custom schema")
+                    reader = reader.schema(self.schema)
+                df = reader.json(self.path)
             else:
                 raise ValueError(f"Unsupported filetype '{self.filetype}'")
 

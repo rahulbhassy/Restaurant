@@ -11,27 +11,38 @@ from Shared.DataLoader import DataLoader
 from Shared.FileIO import SparkTableViewer,DeltaLakeOps , SourceObjectAssignment
 from pyspark.sql.functions import avg, col, lit , round
 from Balancing.config import SCHEMA
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    IntegerType,
+    DoubleType,
+    ArrayType
+)
+
 
 setVEnv()
-table = ['uberfares','tripdetails']
+table = 'dim_outlet'
+spark = create_spark_session()
 loadtype = 'full'
 
-assign = SourceObjectAssignment(
-    loadtype=loadtype,
-    runtype='prod',
-    sourcetables=table
-)
-dlassign = assign.assign_DataLakeIO(layer={'uberfares':'raw','tripdetails':'raw'})
-readers = assign.assign_Readers(io_map=dlassign)
-dataframes = assign.getData(spark=spark,readers=readers)
-uberfares = dataframes['uberfares'].select('trip_id')
-tripdetails = dataframes['tripdetails'].select('trip_id')
-trip_ids = uberfares.join(
-    tripdetails,
-    on='trip_id',
-    how='leftanti'
-)
-print(trip_ids.count())
 
+currentio = DataLakeIO(
+    process="write",
+    table=table,
+    state='current',
+    layer='raw',
+    loadtype=loadtype
+)
+loader = DataLoader(
+    path=currentio.filepath(),
+    filetype='delta',
+    loadtype=loadtype
+)
+df = loader.LoadData(spark)
+
+
+viewer = SparkTableViewer(df)
+viewer.display()
 
 
