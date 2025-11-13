@@ -2,7 +2,7 @@ from typing import List
 from prefect import flow, task
 from prefect_dask.task_runners import DaskTaskRunner
 from prefect import get_run_logger
-from PowerBIRefresh.NoteBooks import Process_PowerBIRefresh
+from Resturant.PowerBIRefresh.NoteBooks import Process_PowerBIRefresh
 
 @task(name="Save Data To SQL Server", tags=["PowerBI","SQL Server"])
 def SaveToSQLServer(configname: List[str],loadtype: str, runtype: str = 'prod'):
