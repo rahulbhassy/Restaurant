@@ -107,10 +107,6 @@ class FactItems:
 
 class FactSalesEnricher:
     def __init__(self, runtype: str , loadtype: str):
-        """
-        :param spark: SparkSession
-        :param cook_sla_seconds: SLA threshold for cooking time in seconds (default 600s = 10min)
-        """
 
         self.cook_sla_seconds = 600
         self.runtype = runtype
@@ -149,11 +145,7 @@ class FactSalesEnricher:
         )
 
     def _aggregate_items(self, df_items: DataFrame) -> DataFrame:
-        """
-        Aggregates fact_sales_items to order-level metrics:
-          total_items, distinct_items_count, total_toppings_count,
-          avg_item_price, max_item_price, min_item_price, items_with_customizations
-        """
+
         agg = (
             df_items
             .groupBy("order_id")
@@ -209,10 +201,6 @@ class FactSalesEnricher:
         return cust_agg
 
     def _kitchen_flags(self, df_kitchen: DataFrame) -> DataFrame:
-        """
-        Optionally compute order-level kitchen flags: cook_duration_seconds and was_delayed_order
-        Expects df_kitchen to have cooking_start and cooking_end as timestamps.
-        """
         if df_kitchen is None:
             return None
 
@@ -237,15 +225,7 @@ class FactSalesEnricher:
                dataframes: dict,
                currentio: Optional[DataLakeIO]
                ) -> DataFrame:
-        """
-        Main entry:
-          df_sales        -> fact_sales (order header)
-          df_items        -> fact_sales_items (item-level exploded)
-          dim_customer    -> dim_customer
-          dim_outlet      -> dim_outlet
-          df_kitchen      -> fact_kitchen (optional)
-        Returns fact_sales_enriched DataFrame
-        """
+
         df_sales = dataframes['fact_sales']
         df_items = dataframes['fact_sales_items']
         dim_customer = dataframes['dim_customer']
@@ -391,12 +371,7 @@ from pyspark.sql.functions import (
 
 class FactStockEnricher:
     def __init__(self, runtype: str, loadtype: str):
-        """
-        - normalize timestamps & quantities
-        - compute inventory_status (low/medium/high)
-        - compute needs_restock flag
-        - join dim_stock_item & dim_outlet
-        """
+
         self.runtype = runtype
         self.loadtype = loadtype
         self.low_threshold = 10.0
