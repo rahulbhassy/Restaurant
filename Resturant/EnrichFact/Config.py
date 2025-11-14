@@ -5,7 +5,7 @@ config = {
         "fact_sales_items",
         "dim_customer",
         "dim_outlet",
-        "fact_kitchen"  # optional
+        "fact_kitchen"  
     ],
 
     "fact_kitchen_enriched": [
