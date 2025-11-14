@@ -71,9 +71,8 @@ def process_table(table: str):
 
     writer.WriteData(df)
 
-    # Adjust max_workers to the number of tables or your system’s capacity
+
 with ThreadPoolExecutor(max_workers=3) as executor:
-    # submit all jobs
     future_to_table = {
         executor.submit(process_table, tbl): tbl
         for tbl in dim_tables
