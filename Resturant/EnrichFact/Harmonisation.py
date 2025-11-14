@@ -125,8 +125,6 @@ class FactSalesEnricher:
             .withColumn("order_week", weekofyear(col(ts_col)))
             .withColumn("order_month", month(col(ts_col)))
             .withColumn("order_year", year(col(ts_col)))
-
-            # Spark 3.x safe replacement for date_format(..., "E")
             .withColumn("day_of_week_num", dayofweek(col(ts_col)))
             .withColumn(
                 "day_of_week",
@@ -138,15 +136,11 @@ class FactSalesEnricher:
                 .when(col("day_of_week_num") == 6, "Friday")
                 .otherwise("Saturday")
             )
-
-            # Weekend flag: Sunday (1) & Saturday (7)
             .withColumn(
                 "is_weekend",
                 when(col("day_of_week_num").isin(1, 7), lit(True))
                 .otherwise(lit(False))
             )
-
-            # Peak hour
             .withColumn(
                 "is_peak_hour",
                 when(col("order_hour").isin(12, 13, 19, 20), lit(True))
@@ -160,7 +154,6 @@ class FactSalesEnricher:
           total_items, distinct_items_count, total_toppings_count,
           avg_item_price, max_item_price, min_item_price, items_with_customizations
         """
-        # safe columns: quantity, unit_price, line_total, toppings
         agg = (
             df_items
             .groupBy("order_id")
@@ -168,17 +161,15 @@ class FactSalesEnricher:
                 spark_sum(col("quantity")).alias("total_items"),
                 countDistinct(col("item_id")).alias("distinct_items_count"),
                 spark_sum(size(col("toppings"))).alias("total_toppings_count"),
-                (spark_sum(col("line_total")) / spark_sum(col("quantity"))).alias("avg_item_price_per_unit"), # fallback
+                (spark_sum(col("line_total")) / spark_sum(col("quantity"))).alias("avg_item_price_per_unit"),
                 spark_max(col("unit_price")).alias("max_item_price"),
                 spark_min(col("unit_price")).alias("min_item_price"),
                 count( when( size(col("toppings")) > 0 , True) ).alias("items_with_customizations")
             )
         )
 
-        # derive is_customized_order boolean
         agg = agg.withColumn("is_customized_order", when(col("items_with_customizations") > 0, lit(True)).otherwise(lit(False)))
 
-        # defensive null fills
         fill_cols = {
             "total_items": 0,
             "distinct_items_count": 0,
@@ -203,18 +194,18 @@ class FactSalesEnricher:
         Note: This uses df_sales itself (historical). If you have a full history
         table, pass that instead.
         """
-        # lifetime sums / counts per customer (global/lifetime)
+
         cust_agg = (
             df_sales
             .groupBy("customer_id")
             .agg(
                 count(col("order_id")).alias("total_orders_by_customer"),
                 spark_sum(col("total_order_price")).alias("customer_lifetime_value"),
-                spark_max(col("order_ts")).alias("last_order_ts")   # latest timestamp
+                spark_max(col("order_ts")).alias("last_order_ts")  
             )
         )
 
-        # days since last order per order: join later using last_order_ts (we compute recency relative to last_order_ts before current order)
+        
         return cust_agg
 
     def _kitchen_flags(self, df_kitchen: DataFrame) -> DataFrame:
@@ -231,7 +222,7 @@ class FactSalesEnricher:
         df = df.withColumn("cook_duration_seconds", (col("cooking_end").cast("long") - col("cooking_start").cast("long")))
         df = df.withColumn("was_delayed_order", when(col("cook_duration_seconds") > self.cook_sla_seconds, lit(True)).otherwise(lit(False)))
 
-        # pick max cook_duration per order (if multiple chefs)
+
         agg = (
             df.groupBy("order_id")
               .agg(
@@ -259,7 +250,7 @@ class FactSalesEnricher:
         df_items = dataframes['fact_sales_items']
         dim_customer = dataframes['dim_customer']
         dim_outlet = dataframes['dim_outlet']
-        df_kitchen = dataframes.get('fact_kitchen', None)  # optional
+        df_kitchen = dataframes.get('fact_kitchen', None)  
 
 
         df_sales = self._time_dims(df_sales, ts_col="order_ts")
@@ -428,14 +419,7 @@ class FactStockEnricher:
         dataframes: dict,
         currentio: Optional[DataLakeIO]
     ) -> DataFrame:
-        """
-        Inputs:
-          df_stock       -> fact_stock (expects columns: outlet_id, stock_item, available_quantity, unit_of_measure, stock_date)
-          dim_stock_item -> dim_stock_item (stock_id / stock_item / unit_of_measure)
-          dim_outlet     -> dim_outlet (outlet_id / outlet_name)
 
-
-        """
         df_stock = dataframes['fact_stock']
         dim_stock_item = dataframes['dim_stock_item']
         dim_outlet = dataframes['dim_outlet']
