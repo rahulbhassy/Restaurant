@@ -48,7 +48,7 @@ class CustomerHarmonizer:
             spark_sum("quantity").alias("items_in_order")
         )
 
-        # Join fact_sales with dim_customer to get enriched customer data
+        
         customer_enriched_df = fact_sales_df.join(
             dim_customer_df,
             fact_sales_df.customer_id == dim_customer_df.customer_id,
@@ -120,7 +120,7 @@ class CustomerPreferenceHarmonizer:
         dataframes: dict,
         currentio: Optional[DataLakeIO]
     ) -> DataFrame:
-        # Placeholder for actual harmonization logic
+        
         fact_sales_df = dataframes.get('fact_sales')
         fact_sales_items_df = dataframes.get('fact_sales_items')
         dim_customer_df = dataframes.get('dim_customer')
@@ -232,7 +232,7 @@ class CustomerPreferenceHarmonizer:
         favorite_hour = hour_counts.withColumn("rn", row_number().over(w_hour)).filter(col("rn") == 1).select(
             "customer_id", col("order_hour").alias("favorite_order_hour"))
 
-        # weekend ratio -> use dayofweek (Spark: Sunday=1, Saturday=7)
+
         sales_time_num = fact_sales_df.withColumn("dow_num", dayofweek(col("order_ts"))) \
             .withColumn("is_weekend", when(col("dow_num").isin(1, 7), 1).otherwise(0))
 
@@ -314,19 +314,19 @@ class ChefPerformanceHarmonizer:
             .withColumn("cooking_hour", hour(col("cooking_start")))
         )
 
-        # total orders cooked
+
         total_orders_agg = (
             kitchen_agg.groupBy("chef_id")
             .agg(count("order_id").alias("total_orders_cooked"))
         )
 
-        # total *distinct* working days
+
         active_days = (
             kitchen_agg.groupBy("chef_id")
             .agg(countDistinct("cooking_date").alias("total_days"))
         )
 
-        # average orders per day
+
         orders_per_day = (
             total_orders_agg.join(active_days, "chef_id")
             .withColumn(
@@ -346,7 +346,7 @@ class ChefPerformanceHarmonizer:
         )
 
 
-        # Peak hours = 12–1 PM (12,13) & 7–9 PM (19,20,21)
+
         peak_hours = [12, 13, 19, 20, 21]
 
         peak_order_count = (
@@ -389,7 +389,7 @@ class ChefPerformanceHarmonizer:
             perf.withColumn("ingested_at", current_timestamp())
         )
 
-        # Final selection (clean ordering)
+
         final_cols = [
             "chef_id", "chef_name", "outlet_id", "outlet_name",
             "total_orders_cooked", "avg_orders_per_day",
