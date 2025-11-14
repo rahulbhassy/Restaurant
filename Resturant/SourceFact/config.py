@@ -73,20 +73,17 @@ table_config = {
         },
         "allowed_values": {"unit_of_measure": ["kg", "g", "litre", "piece"]},
         "duplicate_keys": ["outlet_id", "stock_item", "stock_date"],
-        "anomaly_rules": {"available_quantity": -1}  # negative qty flagged
+        "anomaly_rules": {"available_quantity": -1}  
     }
 }
 delta_column_dict = {
-    # DIM tables (no timestamp columns)
     "dim_customer": None,
     "dim_item": None,
     "dim_outlet": None,
     "dim_chef": None,
     "dim_stock_item": None,
-
-    # FACT tables
     "fact_sales": "order_ts",
-    "fact_kitchen": "cooking_end",    # better for incremental
+    "fact_kitchen": "cooking_end",    
     "fact_stock": None
 }
 
