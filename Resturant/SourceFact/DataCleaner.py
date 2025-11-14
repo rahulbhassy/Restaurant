@@ -14,8 +14,6 @@ class DataCleaner:
                  anomaly_rules=None
                  ):
         """
-        Parameters
-        ----------
         mandatory_cols : list
             Columns that cannot be null or empty.
 
@@ -40,18 +38,14 @@ class DataCleaner:
         self.duplicate_keys = duplicate_keys or []
         self.anomaly_rules = anomaly_rules or {}
 
-    # ------------------------------
-    # Clean string columns (trim)
-    # ------------------------------
+
     def clean_strings(self, df: DataFrame) -> DataFrame:
         for field in df.schema.fields:
             if isinstance(field.dataType, StringType):
                 df = df.withColumn(field.name, trim(col(field.name)))
         return df
 
-    # ------------------------------
-    # Cast columns using config
-    # ------------------------------
+
     def cast_columns(self, df: DataFrame) -> DataFrame:
         for col_name, dtype in self.cast_config.items():
             if dtype == "timestamp":
@@ -64,33 +58,25 @@ class DataCleaner:
                 df = df.withColumn(col_name, col(col_name).cast(StringType()))
         return df
 
-    # ------------------------------
-    # Null Checks
-    # ------------------------------
+
     def null_check(self, df: DataFrame) -> DataFrame:
         for col_name in self.mandatory_cols:
             df = df.filter(col(col_name).isNotNull() & (col(col_name) != ""))
         return df
 
-    # ------------------------------
-    # Drop duplicates
-    # ------------------------------
+
     def drop_duplicates(self, df: DataFrame) -> DataFrame:
         if self.duplicate_keys:
             return df.dropDuplicates(self.duplicate_keys)
         return df
 
-    # ------------------------------
-    # Validate categorical values
-    # ------------------------------
+
     def validate_values(self, df: DataFrame) -> DataFrame:
         for col_name, valid_list in self.allowed_values.items():
             df = df.filter(col(col_name).isin(valid_list))
         return df
 
-    # ------------------------------
-    # Anomaly Detection
-    # ------------------------------
+
     def detect_anomalies(self, df: DataFrame) -> DataFrame:
         for col_name, threshold in self.anomaly_rules.items():
             df = df.withColumn(
@@ -99,15 +85,11 @@ class DataCleaner:
             )
         return df
 
-    # ------------------------------
-    # Add ingestion timestamp
-    # ------------------------------
+
     def add_ingestion_metadata(self, df: DataFrame) -> DataFrame:
         return df.withColumn("ingested_at", self.ingestion_time)
 
-    # ------------------------------
-    # MAIN PIPELINE
-    # ------------------------------
+
     def clean(self, df: DataFrame) -> DataFrame:
         df = self.clean_strings(df)
         df = self.cast_columns(df)
