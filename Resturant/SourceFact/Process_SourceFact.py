@@ -34,7 +34,7 @@ dataops = DeltaLakeOps(
 delta_tables = ['fact_sales', 'fact_kitchen']
 if loadtype == 'delta' and table in delta_tables:
     end_delta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    start_delta = dataops.get_last_loaded_timestamp(spark)
+    start_delta = dataops.get_last_loaded_timestamp(spark=spark,delta_column=delta_column)
 else:
     loadtype = 'full'
 

@@ -22,7 +22,7 @@ from pyspark.sql.types import (
 
 
 setVEnv()
-table = 'dim_outlet'
+table = 'outlet_performance'
 spark = create_spark_session()
 loadtype = 'full'
 
@@ -31,7 +31,7 @@ currentio = DataLakeIO(
     process="write",
     table=table,
     state='current',
-    layer='raw',
+    layer='enrich',
     loadtype=loadtype
 )
 loader = DataLoader(
