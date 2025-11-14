@@ -19,7 +19,7 @@ config = {
         "fact_kitchen",
         "dim_chef",
         "dim_outlet",
-        "fact_sales"      # optional (to add order value cooked by chef)
+        "fact_sales"     
     ]
 }
 layer = {
