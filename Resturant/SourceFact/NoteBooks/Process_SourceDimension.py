@@ -85,7 +85,7 @@ def main(loadtype,runtype='prod'):
 
 
         with ThreadPoolExecutor(max_workers=3) as executor:
-            # submit all jobs
+
             future_to_table = {
                 executor.submit(process_table, tbl): tbl
                 for tbl in dim_tables
@@ -107,7 +107,7 @@ def main(loadtype,runtype='prod'):
         return 1
 
 if __name__ == "__main__":
-    # Force immediate output flushing
+
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
 
